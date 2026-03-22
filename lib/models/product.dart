@@ -42,10 +42,11 @@ class Product {
     );
   }
 
-  /// On web, proxy images through Vercel to avoid CORS
+  /// On web, proxy images through Vercel edge function to avoid CORS
   String get displayImageUrl {
     if (kIsWeb && imageUrl.startsWith('https://toolorkg.com/wp-content/uploads/')) {
-      return imageUrl.replaceFirst('https://toolorkg.com/wp-content/uploads/', '/cdn/');
+      final path = imageUrl.replaceFirst('https://toolorkg.com/wp-content/uploads/', '');
+      return '/api/img?u=${Uri.encodeComponent(path)}';
     }
     return imageUrl;
   }

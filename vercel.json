@@ -2,11 +2,8 @@
   "outputDirectory": "build/web",
   "buildCommand": "",
   "routes": [
-    { "src": "/cdn/(.*)", "dest": "https://toolorkg.com/wp-content/uploads/$1" },
+    { "src": "/api/img", "dest": "/api/img.js" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
-  ]
-}
-/(.*)", "dest": "/index.html" }
   ]
 }
