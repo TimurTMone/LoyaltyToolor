@@ -93,7 +93,7 @@ class CartScreen extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(R.sm),
                           child: CachedNetworkImage(
-                            imageUrl: item.product.imageUrl,
+                            imageUrl: item.product.displayImageUrl,
                             width: 70, height: 88, fit: BoxFit.cover,
                             errorWidget: (_, _, _) => Container(width: 70, height: 88, color: AppColors.surfaceOverlay),
                           ),

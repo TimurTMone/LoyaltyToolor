@@ -251,7 +251,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _heroImage(Product p) {
     final img = CachedNetworkImage(
-      imageUrl: p.imageUrl,
+      imageUrl: p.displayImageUrl,
       fit: BoxFit.cover,
       placeholder: (_, _) => Container(color: AppColors.surfaceElevated),
       errorWidget: (_, _, _) => Container(color: AppColors.surfaceElevated, child: const Icon(Icons.image_not_supported_outlined, size: 40, color: AppColors.textTertiary)),

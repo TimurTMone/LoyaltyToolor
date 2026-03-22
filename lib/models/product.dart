@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 class Product {
   final String id;
   final String name;
@@ -38,6 +40,14 @@ class Product {
       sizes: List<String>.from(map['sizes'] as List),
       colors: List<String>.from(map['colors'] as List),
     );
+  }
+
+  /// On web, proxy images through Vercel to avoid CORS
+  String get displayImageUrl {
+    if (kIsWeb && imageUrl.startsWith('https://toolorkg.com/wp-content/uploads/')) {
+      return imageUrl.replaceFirst('https://toolorkg.com/wp-content/uploads/', '/cdn/');
+    }
+    return imageUrl;
   }
 
   bool get isOnSale => originalPrice != null && originalPrice! > price;

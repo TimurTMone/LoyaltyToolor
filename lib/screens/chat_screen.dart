@@ -342,7 +342,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          Image.network(p.imageUrl, fit: BoxFit.cover, width: double.infinity,
+                          Image.network(p.displayImageUrl, fit: BoxFit.cover, width: double.infinity,
                             errorBuilder: (_, _, _) => Container(color: AppColors.surfaceOverlay)),
                           if (p.isOnSale) Positioned(
                             top: 6, left: 6,

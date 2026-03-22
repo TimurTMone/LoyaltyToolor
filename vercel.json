@@ -1,6 +1,9 @@
 {
   "outputDirectory": "build/web",
   "buildCommand": "",
+  "rewrites": [
+    { "source": "/cdn/:path(.*)", "destination": "https://toolorkg.com/wp-content/uploads/:path" }
+  ],
   "routes": [
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
