@@ -53,12 +53,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
         .animate(CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOutCubic));
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: RadialGradient(
-          center: Alignment(0, -0.3),
+          center: const Alignment(0, -0.3),
           radius: 1.2,
-          colors: [Color(0xFF0F1620), AppColors.background],
+          colors: [
+            isDark ? const Color(0xFF0F1620) : const Color(0xFFEAF1F8),
+            AppColors.background,
+          ],
         ),
       ),
       child: SafeArea(
@@ -79,15 +83,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
                       ),
-                      child: const Icon(Icons.diamond_outlined, size: 28, color: AppColors.accent),
+                      child: Icon(Icons.diamond_outlined, size: 28, color: AppColors.accent),
                     ),
                     const SizedBox(height: S.x32),
-                    const Text(
+                    Text(
                       'TOOLOR',
                       style: TextStyle(fontSize: 44, fontWeight: FontWeight.w800, letterSpacing: 14, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: S.x8),
-                    const Text(
+                    Text(
                       'LOYALTY  &  STORE',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, letterSpacing: 6, color: AppColors.textTertiary),
                     ),
@@ -121,7 +125,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // ─── Main Home ───────────────────────────────────────────────────
   Widget _home(BuildContext context, AuthProvider auth) {
-    final loyalty = auth.loyalty!;
+    final loyalty = auth.loyalty;
+    if (loyalty == null) return const SizedBox.shrink();
     final valid = toolorProducts.where((p) => (p['price'] as num) > 0).toList();
     final saleProducts = valid.where((p) => p['originalPrice'] != null).take(8).map((p) => Product.fromMap(p)).toList();
     final newProducts = valid.take(10).map((p) => Product.fromMap(p)).toList();
@@ -187,8 +192,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Привет, ${auth.user!.name.split(' ').first}',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  'Привет, ${auth.user?.name.split(' ').first ?? ''}',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: S.x2),
                 Text(
@@ -201,11 +206,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Container(
             width: 40, height: 40,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppColors.accent, Color(0xFF7AB8F5)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              gradient: LinearGradient(colors: [AppColors.accent, Color(0xFF7AB8F5)], begin: Alignment.topLeft, end: Alignment.bottomRight),
               borderRadius: BorderRadius.circular(R.sm),
             ),
             child: Center(
-              child: Text(auth.user!.name[0], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+              child: Text(auth.user?.name[0] ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
             ),
           ),
         ],
@@ -238,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 children: [
                   Row(
                     children: [
-                      const Text('TOOLOR', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 3, color: AppColors.textPrimary)),
+                      Text('TOOLOR', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 3, color: AppColors.textPrimary)),
                       const SizedBox(width: S.x8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: S.x6, vertical: 1),
@@ -248,9 +253,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ],
                   ),
                   const SizedBox(height: S.x16),
-                  Text('${loyalty.points}', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.textPrimary, height: 1)),
+                  Text('${loyalty.points}', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.textPrimary, height: 1)),
                   const SizedBox(height: S.x2),
-                  const Text('баллов', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  Text('баллов', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   if (loyalty.tier != LoyaltyTier.platinum) ...[
                     const SizedBox(height: S.x12),
                     ClipRRect(
@@ -265,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     const SizedBox(height: S.x4),
                     Text(
                       '${(loyalty.nextTierThreshold - loyalty.totalSpent).toStringAsFixed(0)} сом до ${_nextTier(loyalty.tier)}',
-                      style: const TextStyle(fontSize: 10, color: AppColors.textTertiary),
+                      style: TextStyle(fontSize: 10, color: AppColors.textTertiary),
                     ),
                   ],
                 ],
@@ -294,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('ПОКАЖИТЕ НА КАССЕ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2, color: AppColors.textSecondary)),
+            Text('ПОКАЖИТЕ НА КАССЕ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2, color: AppColors.textSecondary)),
             const SizedBox(height: S.x24),
             Container(
               padding: const EdgeInsets.all(S.x16),
@@ -302,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: QrImageView(data: loyalty.qrCode, version: QrVersions.auto, size: 220, backgroundColor: Colors.white),
             ),
             const SizedBox(height: S.x16),
-            Text(loyalty.qrCode, style: const TextStyle(fontSize: 13, color: AppColors.textTertiary, letterSpacing: 2, fontWeight: FontWeight.w500)),
+            Text(loyalty.qrCode, style: TextStyle(fontSize: 13, color: AppColors.textTertiary, letterSpacing: 2, fontWeight: FontWeight.w500)),
             const SizedBox(height: S.x8),
           ],
         ),
@@ -343,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(b.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary, height: 1.25)),
+                Text(b.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary, height: 1.25)),
                 Row(
                   children: [
                     Expanded(child: Text(b.subtitle, style: TextStyle(fontSize: 11, color: b.color, fontWeight: FontWeight.w500))),
@@ -365,9 +370,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 2, color: AppColors.textPrimary)),
+          Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 2, color: AppColors.textPrimary)),
           if (trailing != null)
-            Text(trailing, style: const TextStyle(fontSize: 11, color: AppColors.textTertiary, letterSpacing: 0.5)),
+            Text(trailing, style: TextStyle(fontSize: 11, color: AppColors.textTertiary, letterSpacing: 0.5)),
         ],
       ),
     );

@@ -48,6 +48,12 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _trimMessages() {
+    if (_messages.length > 100) {
+      _messages.removeRange(0, _messages.length - 100);
+    }
+  }
+
   void _addBot(String text) {
     setState(() => _typing = true);
     Future.delayed(Duration(milliseconds: 400 + text.length * 8), () {
@@ -55,18 +61,25 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _typing = false;
         _messages.add(_Msg(text: text, isUser: false));
+        _trimMessages();
       });
       _scroll();
     });
   }
 
   void _addChips(List<String> options) {
-    setState(() => _messages.add(_Msg(text: '', isUser: false, chips: options)));
+    setState(() {
+      _messages.add(_Msg(text: '', isUser: false, chips: options));
+      _trimMessages();
+    });
     _scroll();
   }
 
   void _addProductCards(List<Product> products) {
-    setState(() => _messages.add(_Msg(text: '', isUser: false, products: products)));
+    setState(() {
+      _messages.add(_Msg(text: '', isUser: false, products: products));
+      _trimMessages();
+    });
     _scroll();
   }
 
@@ -74,14 +87,20 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.trim().isEmpty) return;
     _inputCtrl.clear();
     HapticFeedback.lightImpact();
-    setState(() => _messages.add(_Msg(text: text, isUser: true)));
+    setState(() {
+      _messages.add(_Msg(text: text, isUser: true));
+      _trimMessages();
+    });
     _scroll();
     _handleInput(text.trim().toLowerCase());
   }
 
   void _handleChip(String chip) {
     HapticFeedback.lightImpact();
-    setState(() => _messages.add(_Msg(text: chip, isUser: true)));
+    setState(() {
+      _messages.add(_Msg(text: chip, isUser: true));
+      _trimMessages();
+    });
     _scroll();
     _handleInput(chip.toLowerCase());
   }
@@ -190,10 +209,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(R.sm)),
-                  child: const Icon(Icons.auto_awesome_rounded, size: 18, color: AppColors.accent),
+                  child: Icon(Icons.auto_awesome_rounded, size: 18, color: AppColors.accent),
                 ),
                 const SizedBox(width: S.x12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -204,9 +223,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 if (_typing)
                   Row(mainAxisSize: MainAxisSize.min, children: [
-                    Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
+                    Container(width: 6, height: 6, decoration: BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
                     const SizedBox(width: 4),
-                    const Text('печатает...', style: TextStyle(fontSize: 11, color: AppColors.accent)),
+                    Text('печатает...', style: TextStyle(fontSize: 11, color: AppColors.accent)),
                   ]),
               ],
             ),
@@ -227,13 +246,13 @@ class _ChatScreenState extends State<ChatScreen> {
           // Input
           Container(
             padding: EdgeInsets.fromLTRB(S.x16, S.x8, S.x8, S.x8 + bot),
-            decoration: const BoxDecoration(color: AppColors.surface, border: Border(top: BorderSide(color: AppColors.divider))),
+            decoration: BoxDecoration(color: AppColors.surface, border: Border(top: BorderSide(color: AppColors.divider))),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _inputCtrl,
-                    style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                    style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
                     decoration: const InputDecoration(
                       hintText: 'Напишите сообщение...',
                       contentPadding: EdgeInsets.symmetric(horizontal: S.x12, vertical: S.x8),
@@ -247,7 +266,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Container(
                     width: 40, height: 40,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [AppColors.accent, Color(0xFF7AB8F5)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                      gradient: LinearGradient(colors: [AppColors.accent, Color(0xFF7AB8F5)], begin: Alignment.topLeft, end: Alignment.bottomRight),
                       borderRadius: BorderRadius.circular(R.pill),
                     ),
                     child: const Icon(Icons.arrow_upward_rounded, size: 20, color: Colors.white),
@@ -307,7 +326,7 @@ class _ChatScreenState extends State<ChatScreen> {
               borderRadius: BorderRadius.circular(R.pill),
               border: Border.all(color: AppColors.surfaceBright),
             ),
-            child: Text(c, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+            child: Text(c, style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
           ),
         )).toList(),
       ),
@@ -360,7 +379,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                           const SizedBox(height: 2),
                           Text(p.formattedPrice, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.isOnSale ? AppColors.sale : AppColors.textPrimary)),
                         ],

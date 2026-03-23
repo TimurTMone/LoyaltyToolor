@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
@@ -56,6 +58,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 backgroundColor: AppColors.surfaceElevated,
                 leading: _pill(Icons.arrow_back_rounded, () => Navigator.pop(context)),
                 actions: [
+                  _pill(Icons.share_rounded, () => _shareProduct(p)),
                   Consumer<FavoritesProvider>(
                     builder: (_, fav, _) {
                       final on = fav.isFavorite(p.id);
@@ -83,10 +86,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       // Breadcrumb
                       Text(
                         '${p.category}  /  ${p.subcategory}'.toUpperCase(),
-                        style: const TextStyle(fontSize: 10, color: AppColors.textTertiary, letterSpacing: 1.5),
+                        style: TextStyle(fontSize: 10, color: AppColors.textTertiary, letterSpacing: 1.5),
                       ),
                       const SizedBox(height: S.x8),
-                      Text(p.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary, height: 1.25)),
+                      Text(p.name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary, height: 1.25)),
                       const SizedBox(height: S.x16),
 
                       // Price
@@ -100,26 +103,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                           if (p.isOnSale) ...[
                             const SizedBox(width: S.x8),
-                            Text(p.formattedOriginalPrice, style: const TextStyle(fontSize: 14, color: AppColors.textTertiary, decoration: TextDecoration.lineThrough)),
+                            Text(p.formattedOriginalPrice, style: TextStyle(fontSize: 14, color: AppColors.textTertiary, decoration: TextDecoration.lineThrough)),
                             const SizedBox(width: S.x8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: S.x6, vertical: S.x2),
                               decoration: BoxDecoration(color: AppColors.saleSoft, borderRadius: BorderRadius.circular(R.xs)),
-                              child: Text('-${p.discountPercent}%', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.sale)),
+                              child: Text('-${p.discountPercent}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.sale)),
                             ),
                           ],
                         ],
                       ),
                       const SizedBox(height: S.x8),
 
-                      // Cashback badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: S.x8, vertical: S.x4),
-                        decoration: BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(R.xs)),
-                        child: Text(
-                          '+${(p.price * 0.05).toStringAsFixed(0)} баллов',
-                          style: const TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w500),
-                        ),
+                      // Badges row
+                      Wrap(
+                        spacing: S.x8,
+                        runSpacing: S.x6,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: S.x8, vertical: S.x4),
+                            decoration: BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(R.xs)),
+                            child: Text(
+                              '+${(p.price * 0.05).toStringAsFixed(0)} баллов',
+                              style: TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          if (p.stock != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: S.x8, vertical: S.x4),
+                              decoration: BoxDecoration(color: AppColors.goldSoft, borderRadius: BorderRadius.circular(R.xs)),
+                              child: Text(
+                                'Осталось ${p.stock} шт',
+                                style: TextStyle(fontSize: 11, color: AppColors.gold, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                        ],
                       ),
 
                       const SizedBox(height: S.x24),
@@ -151,7 +169,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       // Description
                       _label('ОПИСАНИЕ'),
                       const SizedBox(height: S.x8),
-                      Text(p.description, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.6)),
+                      Text(p.description, style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.6)),
 
                       const SizedBox(height: S.x24),
 
@@ -189,6 +207,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                       const SizedBox(height: S.x12),
 
+                      // WhatsApp button
+                      GestureDetector(
+                        onTap: () => _openWhatsApp(p),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(S.x16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF25D366).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(R.md),
+                            border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.chat_rounded, size: 18, color: const Color(0xFF25D366)),
+                              const SizedBox(width: S.x8),
+                              Text('Написать в WhatsApp', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF25D366))),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: S.x12),
+
                       // Info card
                       Container(
                         padding: const EdgeInsets.all(S.x16),
@@ -204,10 +246,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               behavior: HitTestBehavior.opaque,
                               child: Row(
                                 children: [
-                                  const Icon(Icons.location_on_outlined, size: 16, color: AppColors.textTertiary),
+                                  Icon(Icons.location_on_outlined, size: 16, color: AppColors.textTertiary),
                                   const SizedBox(width: S.x12),
-                                  const Expanded(child: Text('7 точек примерки в Бишкеке', style: TextStyle(fontSize: 12, color: AppColors.accent))),
-                                  const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.accent),
+                                  Expanded(child: Text('7 точек примерки в Бишкеке', style: TextStyle(fontSize: 12, color: AppColors.accent))),
+                                  Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.accent),
                                 ],
                               ),
                             ),
@@ -254,7 +296,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       imageUrl: p.displayImageUrl,
       fit: BoxFit.cover,
       placeholder: (_, _) => Container(color: AppColors.surfaceElevated),
-      errorWidget: (_, _, _) => Container(color: AppColors.surfaceElevated, child: const Icon(Icons.image_not_supported_outlined, size: 40, color: AppColors.textTertiary)),
+      errorWidget: (_, _, _) => Container(color: AppColors.surfaceElevated, child: Icon(Icons.image_not_supported_outlined, size: 40, color: AppColors.textTertiary)),
     );
     return widget.heroTag != null ? Hero(tag: widget.heroTag!, child: img) : img;
   }
@@ -274,7 +316,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _label(String text) {
-    return Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: AppColors.textTertiary));
+    return Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: AppColors.textTertiary));
   }
 
   Widget _chip(String text, bool selected, VoidCallback onTap) {
@@ -305,7 +347,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       children: [
         Icon(icon, size: 16, color: AppColors.textTertiary),
         const SizedBox(width: S.x12),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+        Expanded(child: Text(text, style: TextStyle(fontSize: 12, color: AppColors.textSecondary))),
       ],
     );
   }
@@ -315,6 +357,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       padding: const EdgeInsets.symmetric(vertical: S.x12),
       child: Divider(color: AppColors.divider, height: 0.5),
     );
+  }
+
+  void _shareProduct(Product p) {
+    HapticFeedback.selectionClick();
+    final price = p.isOnSale ? '${p.formattedPrice} (было ${p.formattedOriginalPrice})' : p.formattedPrice;
+    SharePlus.instance.share(ShareParams(text: '${p.name} — $price\n\nСмотри в TOOLOR 👉 toolorkg.com'));
+  }
+
+  void _openWhatsApp(Product p) {
+    HapticFeedback.selectionClick();
+    final message = Uri.encodeComponent('Здравствуйте! Хочу узнать про "${p.name}" (${p.formattedPrice})');
+    launchUrl(Uri.parse('https://wa.me/996999955000?text=$message'), mode: LaunchMode.externalApplication);
   }
 
   void _addToCart(Product p) {

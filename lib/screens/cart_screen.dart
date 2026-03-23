@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'checkout_screen.dart';
 
 /// Cart following Shopify/Apple Store pattern:
 /// - Swipe-to-delete with red background
@@ -24,7 +25,7 @@ class CartScreen extends StatelessWidget {
   }
 
   Widget _empty() {
-    return const SafeArea(
+    return SafeArea(
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -56,10 +57,10 @@ class CartScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('КОРЗИНА', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 2, color: AppColors.textPrimary)),
+                Text('КОРЗИНА', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 2, color: AppColors.textPrimary)),
                 GestureDetector(
                   onTap: () => _clearDialog(context, cart),
-                  child: Text('Очистить (${cart.itemCount})', style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                  child: Text('Очистить (${cart.itemCount})', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
                 ),
               ],
             ),
@@ -82,7 +83,7 @@ class CartScreen extends StatelessWidget {
                     decoration: BoxDecoration(color: AppColors.saleSoft, borderRadius: BorderRadius.circular(R.md)),
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: S.x20),
-                    child: const Icon(Icons.delete_outline_rounded, color: AppColors.sale, size: 22),
+                    child: Icon(Icons.delete_outline_rounded, color: AppColors.sale, size: 22),
                   ),
                   child: Container(
                     padding: const EdgeInsets.all(S.x12),
@@ -105,14 +106,14 @@ class CartScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(item.product.name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary, height: 1.3)),
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary, height: 1.3)),
                               const SizedBox(height: S.x2),
-                              Text('${item.selectedSize} \u2022 ${item.selectedColor}', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                              Text('${item.selectedSize} \u2022 ${item.selectedColor}', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                               const SizedBox(height: S.x12),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(item.formattedTotal, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                  Text(item.formattedTotal, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                                   _stepper(cart, i, item.quantity),
                                 ],
                               ),
@@ -130,7 +131,7 @@ class CartScreen extends StatelessWidget {
           // Footer
           Container(
             padding: EdgeInsets.fromLTRB(S.x16, S.x16, S.x16, S.x16 + bot),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.surface,
               border: Border(top: BorderSide(color: AppColors.divider)),
             ),
@@ -144,15 +145,15 @@ class CartScreen extends StatelessWidget {
                   decoration: BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(R.sm)),
                   child: Text(
                     '+$cb баллов ($pct% cashback)',
-                    style: const TextStyle(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w500),
                   ),
                 ),
                 const SizedBox(height: S.x16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Итого', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-                    Text(cart.formattedTotal, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                    Text('Итого', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                    Text(cart.formattedTotal, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
                   ],
                 ),
                 const SizedBox(height: S.x12),
@@ -180,7 +181,7 @@ class CartScreen extends StatelessWidget {
           _stepBtn(Icons.remove_rounded, () { HapticFeedback.selectionClick(); cart.updateQuantity(index, qty - 1); }),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: S.x12),
-            child: Text('$qty', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            child: Text('$qty', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           ),
           _stepBtn(Icons.add_rounded, () { HapticFeedback.selectionClick(); cart.updateQuantity(index, qty + 1); }),
         ],
@@ -204,8 +205,8 @@ class CartScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.lg)),
         title: const Text('Очистить корзину?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена', style: TextStyle(color: AppColors.textTertiary))),
-          TextButton(onPressed: () { cart.clear(); Navigator.pop(ctx); }, child: const Text('Очистить', style: TextStyle(color: AppColors.sale))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Отмена', style: TextStyle(color: AppColors.textTertiary))),
+          TextButton(onPressed: () { cart.clear(); Navigator.pop(ctx); }, child: Text('Очистить', style: TextStyle(color: AppColors.sale))),
         ],
       ),
     );
@@ -213,45 +214,8 @@ class CartScreen extends StatelessWidget {
 
   void _checkout(BuildContext context, CartProvider cart) {
     HapticFeedback.mediumImpact();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        margin: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x16),
-        padding: const EdgeInsets.symmetric(horizontal: S.x24, vertical: S.x32),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(R.xl)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 60, height: 60,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.accent, Color(0xFF7AB8F5)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check_rounded, size: 30, color: Colors.white),
-            ),
-            const SizedBox(height: S.x20),
-            const Text('Заказ оформлен', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-            const SizedBox(height: S.x8),
-            const Text('Мы свяжемся для подтверждения', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(height: S.x20),
-            Wrap(
-              spacing: S.x8,
-              children: ['FINIK PAY', 'QR Obank', 'Elcart'].map((n) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: S.x12, vertical: S.x6),
-                decoration: BoxDecoration(color: AppColors.surfaceElevated, borderRadius: BorderRadius.circular(R.sm)),
-                child: Text(n, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-              )).toList(),
-            ),
-            const SizedBox(height: S.x24),
-            SizedBox(
-              width: double.infinity, height: 50,
-              child: ElevatedButton(onPressed: () { cart.clear(); Navigator.pop(ctx); }, child: const Text('ГОТОВО')),
-            ),
-          ],
-        ),
-      ),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => CheckoutScreen(cart: cart)),
     );
   }
 }

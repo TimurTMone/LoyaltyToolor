@@ -68,14 +68,14 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
             child: TextField(
               controller: _searchCtrl,
               onChanged: (v) => setState(() => _query = v),
-              style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Поиск',
-                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textTertiary, size: 20),
+                prefixIcon: Icon(Icons.search_rounded, color: AppColors.textTertiary, size: 20),
                 suffixIcon: _query.isNotEmpty
                     ? GestureDetector(
                         onTap: () { _searchCtrl.clear(); setState(() => _query = ''); },
-                        child: const Icon(Icons.close_rounded, color: AppColors.textTertiary, size: 18),
+                        child: Icon(Icons.close_rounded, color: AppColors.textTertiary, size: 18),
                       )
                     : null,
               ),
@@ -155,7 +155,7 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
                 padding: const EdgeInsets.fromLTRB(S.x16, S.x8, S.x16, S.x4),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('$count товаров', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                  child: Text('$count товаров', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                 ),
               );
             },
@@ -174,7 +174,7 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
                       children: [
                         Icon(Icons.search_off_rounded, size: 40, color: AppColors.textTertiary.withValues(alpha: 0.4)),
                         const SizedBox(height: S.x12),
-                        const Text('Ничего не найдено', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                        Text('Ничего не найдено', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
                       ],
                     ),
                   );

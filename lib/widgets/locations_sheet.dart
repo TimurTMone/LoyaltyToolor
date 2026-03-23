@@ -74,7 +74,7 @@ void showLocationsSheet(BuildContext context) {
     isScrollControlled: true,
     builder: (_) => Container(
       height: MediaQuery.of(context).size.height * 0.7,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(R.xl)),
       ),
@@ -83,9 +83,9 @@ void showLocationsSheet(BuildContext context) {
           const SizedBox(height: S.x12),
           Container(width: 32, height: 3, decoration: BoxDecoration(color: AppColors.surfaceBright, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: S.x16),
-          const Text('ГДЕ ПРИМЕРИТЬ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 2, color: AppColors.textSecondary)),
+          Text('ГДЕ ПРИМЕРИТЬ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 2, color: AppColors.textSecondary)),
           const SizedBox(height: S.x4),
-          const Text('Магазины, вендинг и мобильный шоурум', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+          Text('Магазины, вендинг и мобильный шоурум', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
           const SizedBox(height: S.x16),
           Expanded(
             child: ListView.separated(
@@ -136,7 +136,7 @@ class _LocationTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(child: Text(location.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                    Expanded(child: Text(location.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: S.x6, vertical: 2),
                       decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
@@ -145,14 +145,14 @@ class _LocationTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: S.x2),
-                Text(location.address, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                Text(location.address, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                 if (location.note != null) ...[
                   const SizedBox(height: S.x2),
                   Text(location.note!, style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.7))),
                 ],
                 if (location.hours != null) ...[
                   const SizedBox(height: S.x2),
-                  Text(location.hours!, style: const TextStyle(fontSize: 10, color: AppColors.textTertiary)),
+                  Text(location.hours!, style: TextStyle(fontSize: 10, color: AppColors.textTertiary)),
                 ],
               ],
             ),

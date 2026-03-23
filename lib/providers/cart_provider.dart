@@ -1,9 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../models/cart_item.dart';
 
 class CartProvider extends ChangeNotifier {
+  static const _key = 'cart_items';
   final List<CartItem> _items = [];
+
+  CartProvider() {
+    _load();
+  }
 
   List<CartItem> get items => List.unmodifiable(_items);
 
@@ -33,11 +40,13 @@ class CartProvider extends ChangeNotifier {
       ));
     }
     notifyListeners();
+    _save();
   }
 
   void removeItem(int index) {
     _items.removeAt(index);
     notifyListeners();
+    _save();
   }
 
   void updateQuantity(int index, int quantity) {
@@ -47,10 +56,60 @@ class CartProvider extends ChangeNotifier {
       _items[index].quantity = quantity;
     }
     notifyListeners();
+    _save();
   }
 
   void clear() {
     _items.clear();
     notifyListeners();
+    _save();
+  }
+
+  Future<void> _save() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = _items.map((item) => jsonEncode({
+        'product': {
+          'id': item.product.id,
+          'name': item.product.name,
+          'price': item.product.price,
+          'originalPrice': item.product.originalPrice,
+          'imageUrl': item.product.imageUrl,
+          'category': item.product.category,
+          'subcategory': item.product.subcategory,
+          'description': item.product.description,
+          'sizes': item.product.sizes,
+          'colors': item.product.colors,
+        },
+        'selectedSize': item.selectedSize,
+        'selectedColor': item.selectedColor,
+        'quantity': item.quantity,
+      })).toList();
+      await prefs.setStringList(_key, list);
+    } catch (_) {
+      // Silently fail — persistence is best-effort
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_key);
+      if (list == null) return;
+      _items.clear();
+      for (final raw in list) {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        final product = Product.fromMap(map['product'] as Map<String, dynamic>);
+        _items.add(CartItem(
+          product: product,
+          selectedSize: map['selectedSize'] as String? ?? 'M',
+          selectedColor: map['selectedColor'] as String? ?? '',
+          quantity: map['quantity'] as int? ?? 1,
+        ));
+      }
+      notifyListeners();
+    } catch (_) {
+      // Corrupt data — start fresh
+    }
   }
 }

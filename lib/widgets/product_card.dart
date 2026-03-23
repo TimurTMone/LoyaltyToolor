@@ -37,6 +37,7 @@ class ProductCard extends StatelessWidget {
                 children: [
                   _image(),
                   if (product.isOnSale) _saleBadge(),
+                  if (product.stock != null) _stockBadge(),
                   _favButton(),
                 ],
               ),
@@ -52,7 +53,7 @@ class ProductCard extends StatelessWidget {
                   product.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textSecondary, height: 1.3),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textSecondary, height: 1.3),
                 ),
                 const SizedBox(height: S.x2),
                 _price(),
@@ -71,7 +72,7 @@ class ProductCard extends StatelessWidget {
       placeholder: (_, _) => Container(color: AppColors.surfaceElevated),
       errorWidget: (_, _, _) => Container(
         color: AppColors.surfaceElevated,
-        child: const Icon(Icons.image_not_supported_outlined, color: AppColors.textTertiary, size: 24),
+        child: Icon(Icons.image_not_supported_outlined, color: AppColors.textTertiary, size: 24),
       ),
     );
     return heroTag != null ? Hero(tag: heroTag!, child: img) : img;
@@ -90,6 +91,24 @@ class ProductCard extends StatelessWidget {
         child: Text(
           '-${product.discountPercent}%',
           style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+        ),
+      ),
+    );
+  }
+
+  Widget _stockBadge() {
+    return Positioned(
+      bottom: S.x8,
+      left: S.x8,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: S.x6, vertical: S.x2),
+        decoration: BoxDecoration(
+          color: AppColors.gold,
+          borderRadius: BorderRadius.circular(R.xs),
+        ),
+        child: Text(
+          'Осталось ${product.stock} шт',
+          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.3),
         ),
       ),
     );
@@ -133,19 +152,19 @@ class ProductCard extends StatelessWidget {
         children: [
           Text(
             product.formattedPrice,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.sale),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.sale),
           ),
           const SizedBox(width: S.x6),
           Text(
             product.formattedOriginalPrice,
-            style: const TextStyle(fontSize: 11, color: AppColors.textTertiary, decoration: TextDecoration.lineThrough),
+            style: TextStyle(fontSize: 11, color: AppColors.textTertiary, decoration: TextDecoration.lineThrough),
           ),
         ],
       );
     }
     return Text(
       product.formattedPrice,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
     );
   }
 }

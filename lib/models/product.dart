@@ -11,6 +11,7 @@ class Product {
   final String description;
   final List<String> sizes;
   final List<String> colors;
+  final int? stock; // null = no scarcity shown
 
   Product({
     required this.id,
@@ -23,23 +24,34 @@ class Product {
     required this.description,
     required this.sizes,
     required this.colors,
+    this.stock,
   });
 
   factory Product.fromMap(Map<String, dynamic> map) {
-    return Product(
-      id: map['id'].toString(),
-      name: map['name'] as String,
-      price: (map['price'] as num).toDouble(),
-      originalPrice: map['originalPrice'] != null
-          ? (map['originalPrice'] as num).toDouble()
-          : null,
-      imageUrl: map['imageUrl'] as String,
-      category: map['category'] as String,
-      subcategory: map['subcategory'] as String,
-      description: map['description'] as String,
-      sizes: List<String>.from(map['sizes'] as List),
-      colors: List<String>.from(map['colors'] as List),
-    );
+    try {
+      final id = (map['id'] ?? '').toString();
+      // Show scarcity on ~25% of products, deterministic by ID hash
+      final hash = id.hashCode.abs();
+      final int? stock = (hash % 4 == 0) ? (hash % 5) + 1 : null; // 1-5 items
+
+      return Product(
+        id: id,
+        name: map['name'] as String? ?? 'Без названия',
+        price: (map['price'] as num?)?.toDouble() ?? 0,
+        originalPrice: map['originalPrice'] != null
+            ? (map['originalPrice'] as num?)?.toDouble()
+            : null,
+        imageUrl: map['imageUrl'] as String? ?? '',
+        category: map['category'] as String? ?? '',
+        subcategory: map['subcategory'] as String? ?? '',
+        description: map['description'] as String? ?? '',
+        sizes: (map['sizes'] as List?)?.cast<String>() ?? ['M'],
+        colors: (map['colors'] as List?)?.cast<String>() ?? [],
+        stock: stock,
+      );
+    } catch (e) {
+      throw FormatException('Product.fromMap failed for id=${map['id']}: $e');
+    }
   }
 
   /// On web, proxy images through Vercel edge function to avoid CORS

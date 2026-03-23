@@ -5,6 +5,7 @@ import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/favorites_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/catalog_screen.dart';
 import 'screens/cart_screen.dart';
@@ -13,12 +14,6 @@ import 'screens/chat_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: AppColors.surface,
-    systemNavigationBarIconBrightness: Brightness.light,
-  ));
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const ToolorApp());
 }
@@ -33,12 +28,28 @@ class ToolorApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: MaterialApp(
-        title: 'TOOLOR',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
-        home: const MainShell(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProv, _) => MaterialApp(
+          title: 'TOOLOR',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: themeProv.themeMode,
+          builder: (context, child) {
+            final bright = Theme.of(context).brightness;
+            AppColors.applyBrightness(bright);
+            SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: bright == Brightness.dark ? Brightness.light : Brightness.dark,
+              systemNavigationBarColor: AppColors.surface,
+              systemNavigationBarIconBrightness: bright == Brightness.dark ? Brightness.light : Brightness.dark,
+            ));
+            return child!;
+          },
+          home: const MainShell(),
+        ),
       ),
     );
   }
@@ -61,7 +72,7 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       body: IndexedStack(index: _tab, children: _screens),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.divider, width: 0.5))),
+        decoration: BoxDecoration(border: Border(top: BorderSide(color: AppColors.divider, width: 0.5))),
         child: Consumer<CartProvider>(
           builder: (context, cart, _) => BottomNavigationBar(
             currentIndex: _tab,
