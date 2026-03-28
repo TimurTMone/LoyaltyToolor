@@ -12,6 +12,7 @@ import 'screens/catalog_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/chat_screen.dart';
+import 'screens/scanner_screen.dart';
 import 'services/api_service.dart';
 
 void main() async {
@@ -70,8 +71,6 @@ class _MainShellState extends State<MainShell> {
   int _tab = 0;
   bool _notificationsStarted = false;
 
-  static const _screens = [HomeScreen(), CatalogScreen(), CartScreen(), ChatScreen(), ProfileScreen()];
-
   @override
   Widget build(BuildContext context) {
     // Start notification polling once the user logs in
@@ -86,8 +85,17 @@ class _MainShellState extends State<MainShell> {
       context.read<NotificationProvider>().stopPolling();
     }
 
+    final isAdmin = auth.user?.isAdmin ?? false;
+    final screens = [
+      const HomeScreen(),
+      const CatalogScreen(),
+      const CartScreen(),
+      isAdmin ? const ScannerScreen() : const ChatScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
-      body: IndexedStack(index: _tab, children: _screens),
+      body: IndexedStack(index: _tab, children: screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(border: Border(top: BorderSide(color: AppColors.divider, width: 0.5))),
         child: Consumer<CartProvider>(
@@ -112,7 +120,11 @@ class _MainShellState extends State<MainShell> {
                 ),
                 label: 'Корзина',
               ),
-              const BottomNavigationBarItem(icon: Icon(Icons.auto_awesome_outlined, size: 22), activeIcon: Icon(Icons.auto_awesome_rounded, size: 22), label: 'AI'),
+              BottomNavigationBarItem(
+                icon: Icon(isAdmin ? Icons.qr_code_scanner_outlined : Icons.auto_awesome_outlined, size: 22),
+                activeIcon: Icon(isAdmin ? Icons.qr_code_scanner_rounded : Icons.auto_awesome_rounded, size: 22),
+                label: isAdmin ? 'Сканер' : 'AI',
+              ),
               const BottomNavigationBarItem(icon: Icon(Icons.person_outline, size: 22), activeIcon: Icon(Icons.person_rounded, size: 22), label: 'Профиль'),
             ],
           ),

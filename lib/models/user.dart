@@ -5,6 +5,7 @@ class AppUser {
   final String? email;
   final String? avatarUrl;
   final DateTime? birthDate;
+  final bool isAdmin;
 
   AppUser({
     required this.id,
@@ -13,6 +14,7 @@ class AppUser {
     this.email,
     this.avatarUrl,
     this.birthDate,
+    this.isAdmin = false,
   });
 
   /// Create an AppUser from the FastAPI backend JSON response.
@@ -27,6 +29,7 @@ class AppUser {
       birthDate: json['birth_date'] != null
           ? DateTime.tryParse(json['birth_date'] as String)
           : null,
+      isAdmin: json['is_admin'] == true,
     );
   }
 
