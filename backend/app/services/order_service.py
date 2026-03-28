@@ -30,6 +30,7 @@ async def create_order_from_cart(
     try_at_home: bool = False,
     points_used: int = 0,
     promo_code: str | None = None,
+    pickup_location_id=None,
 ) -> Order:
     # Fetch cart items with products
     result = await db.execute(
@@ -83,6 +84,13 @@ async def create_order_from_cart(
     loyalty = loyalty_result.scalar_one_or_none()
 
     if points_used > 0 and loyalty:
+        # Validate: can't redeem more points than available
+        if points_used > loyalty.points:
+            raise ValueError(f"Недостаточно баллов. Доступно: {loyalty.points}")
+        # Validate: can't redeem more points than the order total after promo discount
+        max_redeemable = int(subtotal - discount_amount)
+        if points_used > max_redeemable:
+            raise ValueError(f"Нельзя списать больше баллов, чем сумма заказа ({max_redeemable})")
         points_discount = await redeem_points(db, loyalty, points_used)
 
     total = max(subtotal - discount_amount - points_discount, Decimal(0))
@@ -104,6 +112,7 @@ async def create_order_from_cart(
         delivery_address=delivery_address,
         delivery_notes=delivery_notes,
         try_at_home=try_at_home,
+        pickup_location_id=pickup_location_id,
     )
     db.add(order)
     await db.flush()

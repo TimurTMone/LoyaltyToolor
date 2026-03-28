@@ -8,11 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import get_db, require_admin
+from app.models.notification import Notification
 from app.models.order import Order
 from app.models.user import Profile
 from app.schemas.order import AdminOrderOut, OrderStatusUpdate
 
 router = APIRouter(dependencies=[Depends(require_admin)])
+
+ORDER_STATUS_MESSAGES = {
+    "payment_confirmed": "Оплата подтверждена",
+    "processing": "Заказ в обработке",
+    "ready_for_pickup": "Заказ готов к выдаче",
+    "shipped": "Заказ отправлен",
+    "delivered": "Заказ доставлен",
+    "cancelled": "Заказ отменён",
+}
 
 
 @router.get("", response_model=dict)
@@ -92,10 +102,24 @@ async def update_order_status(
     if body.status == "payment_confirmed":
         order.confirmed_by = admin.id
         order.confirmed_at = now
+    elif body.status == "ready_for_pickup":
+        order.ready_for_pickup_at = now
+        order.pickup_ready_at = now
     elif body.status == "shipped":
         order.shipped_at = now
     elif body.status == "delivered":
         order.delivered_at = now
+
+    # Create notification for user about status change
+    status_msg = ORDER_STATUS_MESSAGES.get(body.status, body.status)
+    notification = Notification(
+        user_id=order.user_id,
+        type="order_status",
+        title=f"Заказ #{order.order_number}",
+        body=status_msg,
+        data={"order_id": str(order.id), "status": body.status},
+    )
+    db.add(notification)
 
     await db.commit()
     await db.refresh(order)

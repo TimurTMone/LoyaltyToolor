@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import auth, users, loyalty, products, orders, cart, favorites, chat, locations, promo_codes
+from app.routers import auth, users, loyalty, products, orders, cart, favorites, chat, locations, promo_codes, notifications, referrals
 from app.routers.admin import (
     products as admin_products,
     orders as admin_orders,
@@ -17,6 +17,7 @@ from app.routers.admin import (
     promo_codes as admin_promo_codes,
     locations as admin_locations,
     dashboard as admin_dashboard,
+    notifications as admin_notifications,
 )
 
 
@@ -53,6 +54,8 @@ app.include_router(favorites.router, prefix="/api/v1/favorites", tags=["favorite
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(locations.router, prefix="/api/v1/locations", tags=["locations"])
 app.include_router(promo_codes.router, prefix="/api/v1/promo-codes", tags=["promo-codes"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["notifications"])
+app.include_router(referrals.router, prefix="/api/v1/referrals", tags=["referrals"])
 
 # Admin routers
 app.include_router(admin_dashboard.router, prefix="/api/v1/admin", tags=["admin"])
@@ -62,6 +65,7 @@ app.include_router(admin_users.router, prefix="/api/v1/admin/users", tags=["admi
 app.include_router(admin_categories.router, prefix="/api/v1/admin/categories", tags=["admin-categories"])
 app.include_router(admin_promo_codes.router, prefix="/api/v1/admin/promo-codes", tags=["admin-promo-codes"])
 app.include_router(admin_locations.router, prefix="/api/v1/admin/locations", tags=["admin-locations"])
+app.include_router(admin_notifications.router, prefix="/api/v1/admin/notifications", tags=["admin-notifications"])
 
 
 @app.get("/api/v1/health")

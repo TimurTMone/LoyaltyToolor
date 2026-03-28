@@ -51,3 +51,12 @@ class QrScanResponse(BaseModel):
     valid: bool
     reason: str | None = None
     customer: QrScanCustomer | None = None
+
+
+class MilestonesOut(BaseModel):
+    current_tier: str
+    current_spent: float
+    next_tier: str | None = None
+    next_tier_threshold: float | None = None
+    remaining: float
+    progress_percent: float

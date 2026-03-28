@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
+from app.models.loyalty import LoyaltyAccount
 from app.models.user import Profile
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
 from app.services.auth_service import (
@@ -12,6 +13,7 @@ from app.services.auth_service import (
     verify_password,
     verify_token,
 )
+from app.services.loyalty_service import check_birthday_reward
 
 router = APIRouter()
 
@@ -47,6 +49,17 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid phone or password")
+
+    # Check birthday reward on login
+    if user.birth_date:
+        loyalty_result = await db.execute(
+            select(LoyaltyAccount).where(LoyaltyAccount.user_id == user.id)
+        )
+        loyalty = loyalty_result.scalar_one_or_none()
+        if loyalty:
+            await check_birthday_reward(db, user, loyalty)
+            await db.commit()
+
     return TokenResponse(
         access_token=create_access_token(user),
         refresh_token=create_refresh_token(user),

@@ -3,19 +3,26 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
+import '../providers/notification_provider.dart';
 import '../providers/theme_provider.dart';
 import '../models/user.dart';
 import '../models/loyalty.dart';
 import '../theme/app_theme.dart';
 import '../widgets/locations_sheet.dart';
+import '../services/api_service.dart';
+import '../models/product.dart';
+import 'notifications_screen.dart';
+import 'orders_screen.dart';
+import 'referral_screen.dart';
 
 /// Profile/Loyalty screen following premium brand patterns:
 /// - Stats dashboard (3 cols)
 /// - QR card with tap-to-expand
 /// - Tier ladder with active highlight
+/// - Loyalty milestones progress
+/// - Birthday reward
 /// - Transaction feed
 /// - Grouped menu list
 class ProfileScreen extends StatelessWidget {
@@ -66,11 +73,14 @@ class ProfileScreen extends StatelessWidget {
               padding: const EdgeInsets.all(S.x16),
               child: Column(
                 children: [
-                  _userRow(user),
+                  _userRow(context, user),
                   const SizedBox(height: S.x20),
+                  _birthdaySection(context, user, auth),
                   _stats(loyalty),
                   const SizedBox(height: S.x20),
                   _qrCard(context, loyalty),
+                  const SizedBox(height: S.x20),
+                  _milestoneCard(loyalty),
                   const SizedBox(height: S.x20),
                   _tiers(loyalty),
                   const SizedBox(height: S.x20),
@@ -95,7 +105,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _userRow(AppUser user) {
+  Widget _userRow(BuildContext context, AppUser user) {
     return Row(
       children: [
         Container(
@@ -104,7 +114,7 @@ class ProfileScreen extends StatelessWidget {
             gradient: LinearGradient(colors: [AppColors.accent, Color(0xFF7AB8F5)], begin: Alignment.topLeft, end: Alignment.bottomRight),
             borderRadius: BorderRadius.circular(R.md),
           ),
-          child: Center(child: Text(user.name[0], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white))),
+          child: Center(child: Text(user.name.isNotEmpty ? user.name[0] : '?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white))),
         ),
         const SizedBox(width: S.x12),
         Expanded(
@@ -116,8 +126,184 @@ class ProfileScreen extends StatelessWidget {
             ],
           ),
         ),
+        // Notification bell
+        Consumer<NotificationProvider>(
+          builder: (context, notifProvider, _) {
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+              },
+              child: Badge(
+                isLabelVisible: notifProvider.unreadCount > 0,
+                backgroundColor: AppColors.sale,
+                label: Text(
+                  '${notifProvider.unreadCount}',
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+                child: Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(R.sm),
+                  ),
+                  child: Icon(Icons.notifications_outlined, size: 20, color: AppColors.textSecondary),
+                ),
+              ),
+            );
+          },
+        ),
       ],
     );
+  }
+
+  // ── Birthday Section ──────────────────────────────────────────────
+
+  Widget _birthdaySection(BuildContext context, AppUser user, AuthProvider auth) {
+    // Birthday banner if today is user's birthday
+    final now = DateTime.now();
+    final isBirthday = user.birthDate != null &&
+        user.birthDate!.month == now.month &&
+        user.birthDate!.day == now.day;
+
+    if (isBirthday) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: S.x20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(S.x16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.pinkAccent.withValues(alpha: 0.15), Colors.purpleAccent.withValues(alpha: 0.08)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(R.lg),
+            border: Border.all(color: Colors.pinkAccent.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              const Text('\u{1F382}', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: S.x12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('С Днём рождения!', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    Text('Проверьте бонусные баллы в подарок', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Birthday prompt if not set
+    if (user.birthDate == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: S.x20),
+        child: GestureDetector(
+          onTap: () => _pickBirthday(context, auth),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(S.x16),
+            decoration: BoxDecoration(
+              color: AppColors.goldSoft,
+              borderRadius: BorderRadius.circular(R.lg),
+              border: Border.all(color: AppColors.gold.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.cake_rounded, size: 24, color: AppColors.gold),
+                const SizedBox(width: S.x12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Укажите дату рождения', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      Text('и получите 1000 баллов!', style: TextStyle(fontSize: 12, color: AppColors.gold)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textTertiary),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Birthday is set — show it in a compact row
+    final fmt = DateFormat('dd MMMM yyyy', 'ru');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: S.x20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: S.x16, vertical: S.x12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(R.md),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.cake_outlined, size: 18, color: AppColors.textTertiary),
+            const SizedBox(width: S.x8),
+            Text('Дата рождения: ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text(fmt.format(user.birthDate!), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _pickBirthday(BuildContext context, AuthProvider auth) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000, 1, 1),
+      firstDate: DateTime(1940),
+      lastDate: now,
+      helpText: 'ДАТА РОЖДЕНИЯ',
+      cancelText: 'ОТМЕНА',
+      confirmText: 'СОХРАНИТЬ',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AppColors.accent,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked == null) return;
+
+    try {
+      final dateStr = DateFormat('yyyy-MM-dd').format(picked);
+      await ApiService.dio.patch(
+        '/api/v1/users/me/birthday',
+        data: {'birth_date': dateStr},
+      );
+      // Refresh profile to get the updated birthDate
+      await auth.fetchProfile();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Дата рождения сохранена! +1000 баллов')),
+        );
+        // Also refresh loyalty to see updated points
+        auth.fetchLoyalty();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось сохранить дату рождения')),
+        );
+      }
+    }
   }
 
   Widget _stats(LoyaltyAccount l) {
@@ -233,6 +419,121 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // ── Loyalty Milestones ───────────────────────────────────────────
+
+  Widget _milestoneCard(LoyaltyAccount l) {
+    final (Color tierColor, String tierLabel) = _tierInfo(l.tier);
+    final nextTierLabel = _nextTierName(l.tier);
+    final nextTierColor = _nextTierColor(l.tier);
+    final remaining = l.nextTierThreshold - l.totalSpent;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(S.x16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(R.md),
+        border: Border.all(color: tierColor.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('ПРОГРЕСС УРОВНЯ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: AppColors.textTertiary)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: S.x8, vertical: S.x2),
+                decoration: BoxDecoration(
+                  color: tierColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.star_rounded, size: 12, color: tierColor),
+                    const SizedBox(width: S.x4),
+                    Text(tierLabel.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: tierColor, letterSpacing: 0.5)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: S.x16),
+          if (l.tier != LoyaltyTier.platinum) ...[
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: l.progressToNextTier.clamp(0.0, 1.0),
+                backgroundColor: AppColors.surfaceBright,
+                valueColor: AlwaysStoppedAnimation(nextTierColor),
+                minHeight: 8,
+              ),
+            ),
+            const SizedBox(height: S.x12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.star_rounded, size: 14, color: tierColor),
+                    const SizedBox(width: S.x4),
+                    Text(tierLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: tierColor)),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Text(nextTierLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: nextTierColor)),
+                    const SizedBox(width: S.x4),
+                    Icon(Icons.star_rounded, size: 14, color: nextTierColor),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: S.x8),
+            Text(
+              'До уровня $nextTierLabel осталось ${Product.formatPrice(remaining)} сом',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ] else ...[
+            // Platinum — max level
+            Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, size: 20, color: AppColors.platinum),
+                const SizedBox(width: S.x8),
+                Expanded(
+                  child: Text('Максимальный уровень достигнут!', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.platinum)),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  (Color, String) _tierInfo(LoyaltyTier tier) => switch (tier) {
+    LoyaltyTier.bronze => (AppColors.bronze, 'Bronze'),
+    LoyaltyTier.silver => (AppColors.silver, 'Silver'),
+    LoyaltyTier.gold => (AppColors.goldTier, 'Gold'),
+    LoyaltyTier.platinum => (AppColors.platinum, 'Platinum'),
+  };
+
+  String _nextTierName(LoyaltyTier tier) => switch (tier) {
+    LoyaltyTier.bronze => 'Silver',
+    LoyaltyTier.silver => 'Gold',
+    LoyaltyTier.gold => 'Platinum',
+    LoyaltyTier.platinum => 'Platinum',
+  };
+
+  Color _nextTierColor(LoyaltyTier tier) => switch (tier) {
+    LoyaltyTier.bronze => AppColors.silver,
+    LoyaltyTier.silver => AppColors.goldTier,
+    LoyaltyTier.gold => AppColors.platinum,
+    LoyaltyTier.platinum => AppColors.platinum,
+  };
+
   Widget _tiers(LoyaltyAccount l) {
     final tiers = [
       ('BRONZE', '3%', '0', LoyaltyTier.bronze, AppColors.bronze),
@@ -333,11 +634,20 @@ class ProfileScreen extends StatelessWidget {
       child: Column(
         children: [
           _menuRow(Icons.favorite_outline_rounded, 'Избранное', () => _showFav(context)),
-          _div(), _menuRow(Icons.receipt_long_outlined, 'Мои заказы', () {}),
+          _div(),
+          _menuRow(Icons.receipt_long_outlined, 'Мои заказы', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
+          }),
+          _div(),
+          _menuRow(Icons.card_giftcard_rounded, 'Пригласить друга', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ReferralScreen()));
+          }),
           _div(), _menuRow(Icons.card_giftcard_rounded, 'Box подписка', () => _showBox(context)),
           _div(), _menuRow(Icons.local_offer_outlined, 'Промокоды', () {}),
           _div(), _menuRow(Icons.location_on_outlined, 'Наши точки', () => showLocationsSheet(context)),
-          _div(), _menuRow(Icons.people_outline_rounded, 'Пригласить друга', () => _showRef(context)),
+          _div(), _menuRow(Icons.notifications_outlined, 'Уведомления', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+          }),
           _div(), _menuRow(Icons.info_outline_rounded, 'О Toolor', () => _showAbout(context)),
           _div(), _menuRow(Icons.brightness_6_outlined, 'Тема оформления', () => _showThemePicker(context)),
         ],
@@ -428,39 +738,6 @@ class ProfileScreen extends StatelessWidget {
         Text(desc, style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
       ]),
     ));
-  }
-
-  void _showRef(BuildContext context) {
-    showModalBottomSheet(
-      context: context, backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        margin: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x16),
-        padding: const EdgeInsets.all(S.x24),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(R.xl)),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('ПРИГЛАСИ ДРУГА', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 2, color: AppColors.textPrimary)),
-          const SizedBox(height: S.x8),
-          Text('500 баллов вам и другу', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-          const SizedBox(height: S.x20),
-          Container(
-            padding: const EdgeInsets.all(S.x16),
-            decoration: BoxDecoration(color: AppColors.surfaceElevated, borderRadius: BorderRadius.circular(R.md)),
-            child: Row(children: [
-              Expanded(child: Text('TOOLOR-REF-ALIYA', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.accent, letterSpacing: 1))),
-              GestureDetector(
-                onTap: () { Clipboard.setData(const ClipboardData(text: 'TOOLOR-REF-ALIYA')); HapticFeedback.lightImpact(); },
-                child: Icon(Icons.copy_rounded, size: 18, color: AppColors.textTertiary),
-              ),
-            ]),
-          ),
-          const SizedBox(height: S.x20),
-          SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () {
-            Navigator.pop(ctx);
-            SharePlus.instance.share(ShareParams(text: 'Заходи в TOOLOR — стильная одежда с кэшбэком! Используй мой код TOOLOR-REF-ALIYA и получи 500 баллов 🎁\n\ntoolorkg.com'));
-          }, child: const Text('ПОДЕЛИТЬСЯ'))),
-        ]),
-      ),
-    );
   }
 
   void _showAbout(BuildContext context) {

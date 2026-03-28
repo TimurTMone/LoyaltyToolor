@@ -5,6 +5,7 @@ import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/favorites_provider.dart';
+import 'providers/notification_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/catalog_screen.dart';
@@ -30,6 +31,7 @@ class ToolorApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: Consumer<ThemeProvider>(
@@ -66,11 +68,24 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _tab = 0;
+  bool _notificationsStarted = false;
 
   static const _screens = [HomeScreen(), CatalogScreen(), CartScreen(), ChatScreen(), ProfileScreen()];
 
   @override
   Widget build(BuildContext context) {
+    // Start notification polling once the user logs in
+    final auth = context.watch<AuthProvider>();
+    if (auth.isLoggedIn && !_notificationsStarted) {
+      _notificationsStarted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<NotificationProvider>().startPolling();
+      });
+    } else if (!auth.isLoggedIn && _notificationsStarted) {
+      _notificationsStarted = false;
+      context.read<NotificationProvider>().stopPolling();
+    }
+
     return Scaffold(
       body: IndexedStack(index: _tab, children: _screens),
       bottomNavigationBar: Container(

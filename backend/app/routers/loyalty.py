@@ -3,6 +3,7 @@ import hmac
 import math
 import secrets
 import time
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
@@ -15,10 +16,12 @@ from app.models.user import Profile
 from app.schemas.loyalty import (
     LoyaltyAccountOut,
     LoyaltyTransactionOut,
+    MilestonesOut,
     QrScanRequest,
     QrScanResponse,
     QrScanCustomer,
 )
+from app.services.loyalty_service import get_next_tier, TIER_ORDER
 
 router = APIRouter()
 
@@ -132,4 +135,46 @@ async def scan_qr_token(
             total_spent=loyalty.total_spent,
             cashback_percent=cashback,
         ),
+    )
+
+
+@router.get("/me/milestones", response_model=MilestonesOut)
+async def get_my_milestones(
+    user: Profile = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(LoyaltyAccount).where(LoyaltyAccount.user_id == user.id)
+    )
+    loyalty = result.scalar_one_or_none()
+    if not loyalty:
+        raise HTTPException(status_code=404, detail="Loyalty account not found")
+
+    next_tier, next_threshold = get_next_tier(loyalty.tier)
+    current_spent = float(loyalty.total_spent)
+
+    if next_tier and next_threshold:
+        remaining = float(next_threshold) - current_spent
+        # Calculate progress within current tier range
+        current_tier_idx = TIER_ORDER.index(loyalty.tier)
+        if current_tier_idx == 0:
+            current_threshold = 0.0
+        else:
+            from app.services.loyalty_service import TIER_THRESHOLDS
+            current_threshold = float(
+                next(t for t, tier in TIER_THRESHOLDS if tier == loyalty.tier)
+            )
+        range_total = float(next_threshold) - current_threshold
+        progress = ((current_spent - current_threshold) / range_total * 100) if range_total > 0 else 100.0
+    else:
+        remaining = 0.0
+        progress = 100.0
+
+    return MilestonesOut(
+        current_tier=loyalty.tier,
+        current_spent=current_spent,
+        next_tier=next_tier,
+        next_tier_threshold=float(next_threshold) if next_threshold else None,
+        remaining=remaining,
+        progress_percent=round(progress, 1),
     )

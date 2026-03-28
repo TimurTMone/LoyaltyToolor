@@ -2,15 +2,21 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/locations_sheet.dart';
+import '../models/product.dart';
 
-/// QR-based checkout flow:
-/// 1. Show order total + MBank QR
-/// 2. User saves QR → opens banking app → transfers money
-/// 3. User uploads payment screenshot as proof
-/// 4. Order confirmed, awaiting manual verification
+/// QR-based checkout flow with points redemption and pickup option:
+/// 0. Delivery type selection (delivery vs. pickup)
+/// 1. Points redemption slider
+/// 2. Show order total + MBank QR
+/// 3. User saves QR -> opens banking app -> transfers money
+/// 4. User uploads payment screenshot as proof
+/// 5. Order confirmed, awaiting manual verification
 class CheckoutScreen extends StatefulWidget {
   final CartProvider cart;
   const CheckoutScreen({super.key, required this.cart});
@@ -19,34 +25,496 @@ class CheckoutScreen extends StatefulWidget {
   State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
-enum _Step { pay, upload, done }
+enum _Step { delivery, pay, upload, done }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  _Step _step = _Step.pay;
+  _Step _step = _Step.delivery;
   File? _proof;
   final _picker = ImagePicker();
   bool _isSubmitting = false;
   String? _orderNumber;
   String? _submitError;
 
+  // Delivery type
+  String _deliveryType = 'delivery'; // 'delivery' or 'pickup'
+  ToolorLocation? _selectedPickupLocation;
+  List<ToolorLocation> _locations = [];
+  bool _isLoadingLocations = false;
+
+  // Points redemption
+  double _pointsToRedeem = 0;
+  int _availablePoints = 0;
+
+  // Cashback earned
+  int? _cashbackEarned;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPoints();
+    _fetchLocations();
+  }
+
+  void _loadPoints() {
+    final auth = context.read<AuthProvider>();
+    _availablePoints = auth.loyalty?.points ?? 0;
+  }
+
+  Future<void> _fetchLocations() async {
+    setState(() => _isLoadingLocations = true);
+    try {
+      final response = await ApiService.dio.get('/api/v1/locations');
+      final data = response.data;
+      final List<dynamic> items =
+          data is List ? data : (data['items'] as List? ?? data as List);
+      if (!mounted) return;
+      setState(() {
+        _locations = items
+            .map((json) =>
+                ToolorLocation.fromJson(json as Map<String, dynamic>))
+            .where((loc) => loc.type == LocationType.store)
+            .toList();
+        _isLoadingLocations = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        // Fallback: use hardcoded store locations
+        _locations = [
+          const ToolorLocation(
+            name: 'TOOLOR AsiaMall',
+            address: 'AsiaMall, 2 этаж, бутик 19(1)',
+            type: LocationType.store,
+            hours: '10:00-22:00',
+          ),
+        ];
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
+  double get _orderTotal => widget.cart.totalPrice;
+
+  double get _pointsValue => _pointsToRedeem; // 1 point = 1 KGS
+
+  double get _maxRedeemable =>
+      _availablePoints < _orderTotal ? _availablePoints.toDouble() : _orderTotal;
+
+  double get _finalTotal => (_orderTotal - _pointsValue).clamp(0, _orderTotal);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_step == _Step.done ? 'Готово' : 'Оплата'),
+        title: Text(_step == _Step.done
+            ? 'Готово'
+            : _step == _Step.delivery
+                ? 'Оформление'
+                : 'Оплата'),
         leading: _step == _Step.done
             ? null
-            : IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => Navigator.pop(context)),
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () {
+                  if (_step == _Step.pay) {
+                    setState(() => _step = _Step.delivery);
+                  } else if (_step == _Step.upload) {
+                    setState(() => _step = _Step.pay);
+                  } else {
+                    Navigator.pop(context);
+                  }
+                }),
       ),
       body: SafeArea(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: switch (_step) {
+            _Step.delivery => _deliveryStep(),
             _Step.pay => _payStep(),
             _Step.upload => _uploadStep(),
             _Step.done => _doneStep(),
           },
         ),
+      ),
+    );
+  }
+
+  // ─── Step 0: Delivery type + Points ───────────────────────────────
+
+  Widget _deliveryStep() {
+    return SingleChildScrollView(
+      key: const ValueKey('delivery'),
+      padding: const EdgeInsets.all(S.x16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Delivery type
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(S.x16),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(R.lg),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('СПОСОБ ПОЛУЧЕНИЯ',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                        color: AppColors.textTertiary)),
+                const SizedBox(height: S.x12),
+                _deliveryOption(
+                  'delivery',
+                  Icons.local_shipping_rounded,
+                  'Доставка',
+                  'Курьером по Бишкеку',
+                ),
+                const SizedBox(height: S.x8),
+                _deliveryOption(
+                  'pickup',
+                  Icons.storefront_rounded,
+                  'Самовывоз',
+                  'Заберите из магазина',
+                ),
+              ],
+            ),
+          ),
+
+          // Pickup location selector
+          if (_deliveryType == 'pickup') ...[
+            const SizedBox(height: S.x16),
+            _pickupLocationSelector(),
+          ],
+
+          const SizedBox(height: S.x20),
+
+          // Points redemption
+          if (_availablePoints > 0) _pointsRedemptionCard(),
+
+          const SizedBox(height: S.x20),
+
+          // Order summary
+          _orderSummary(),
+
+          const SizedBox(height: S.x24),
+
+          // CTA
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: (_deliveryType == 'pickup' &&
+                      _selectedPickupLocation == null)
+                  ? null
+                  : () => setState(() => _step = _Step.pay),
+              child: const Text('ПРОДОЛЖИТЬ К ОПЛАТЕ'),
+            ),
+          ),
+
+          const SizedBox(height: S.x32),
+        ],
+      ),
+    );
+  }
+
+  Widget _deliveryOption(
+      String value, IconData icon, String title, String subtitle) {
+    final selected = _deliveryType == value;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() {
+          _deliveryType = value;
+          if (value != 'pickup') _selectedPickupLocation = null;
+        });
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(S.x12),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accent.withValues(alpha: 0.06)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(R.md),
+          border: Border.all(
+              color: selected
+                  ? AppColors.accent.withValues(alpha: 0.3)
+                  : AppColors.divider),
+        ),
+        child: Row(
+          children: [
+            Icon(icon,
+                size: 22,
+                color: selected ? AppColors.accent : AppColors.textTertiary),
+            const SizedBox(width: S.x12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: selected
+                              ? AppColors.accent
+                              : AppColors.textPrimary)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          fontSize: 11, color: AppColors.textTertiary)),
+                ],
+              ),
+            ),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: selected ? AppColors.accent : AppColors.textTertiary,
+                    width: selected ? 6 : 1.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pickupLocationSelector() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(S.x16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(R.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('ВЫБЕРИТЕ МАГАЗИН',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                  color: AppColors.textTertiary)),
+          const SizedBox(height: S.x12),
+          if (_isLoadingLocations)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: S.x16),
+              child: Center(
+                  child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2))),
+            )
+          else
+            ..._locations.map((loc) {
+              final selected = _selectedPickupLocation?.name == loc.name;
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedPickupLocation = loc);
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: S.x8),
+                  padding: const EdgeInsets.all(S.x12),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.accent.withValues(alpha: 0.06)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(R.sm),
+                    border: Border.all(
+                        color: selected
+                            ? AppColors.accent.withValues(alpha: 0.3)
+                            : AppColors.divider),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.storefront_rounded,
+                          size: 18,
+                          color: selected
+                              ? AppColors.accent
+                              : AppColors.textTertiary),
+                      const SizedBox(width: S.x12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(loc.name,
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textPrimary)),
+                            Text(loc.address,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textTertiary)),
+                            if (loc.hours != null)
+                              Text(loc.hours!,
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.textTertiary)),
+                          ],
+                        ),
+                      ),
+                      if (selected)
+                        Icon(Icons.check_circle_rounded,
+                            size: 20, color: AppColors.accent),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _pointsRedemptionCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(S.x16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(R.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.star_rounded, size: 18, color: AppColors.gold),
+              const SizedBox(width: S.x8),
+              Text('ИСПОЛЬЗОВАТЬ БАЛЛЫ',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                      color: AppColors.textTertiary)),
+            ],
+          ),
+          const SizedBox(height: S.x8),
+          Text('Доступно: $_availablePoints баллов',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          const SizedBox(height: S.x12),
+          Row(
+            children: [
+              Text('0',
+                  style: TextStyle(
+                      fontSize: 11, color: AppColors.textTertiary)),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderThemeData(
+                    activeTrackColor: AppColors.accent,
+                    inactiveTrackColor: AppColors.surfaceBright,
+                    thumbColor: AppColors.accent,
+                    overlayColor: AppColors.accent.withValues(alpha: 0.1),
+                    trackHeight: 3,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 8),
+                  ),
+                  child: Slider(
+                    value: _pointsToRedeem,
+                    min: 0,
+                    max: _maxRedeemable,
+                    divisions:
+                        _maxRedeemable > 0 ? _maxRedeemable.toInt() : 1,
+                    onChanged: (val) => setState(() => _pointsToRedeem = val),
+                  ),
+                ),
+              ),
+              Text('${_maxRedeemable.toInt()}',
+                  style: TextStyle(
+                      fontSize: 11, color: AppColors.textTertiary)),
+            ],
+          ),
+          if (_pointsToRedeem > 0)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: S.x8),
+              padding: const EdgeInsets.all(S.x12),
+              decoration: BoxDecoration(
+                color: AppColors.accentSoft,
+                borderRadius: BorderRadius.circular(R.sm),
+              ),
+              child: Text(
+                '${_pointsToRedeem.toInt()} баллов = ${Product.formatPrice(_pointsValue)} сом скидка',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _orderSummary() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(S.x16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(R.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('ИТОГО',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                  color: AppColors.textTertiary)),
+          const SizedBox(height: S.x12),
+          _summaryRow('Товары', widget.cart.formattedTotal),
+          if (_pointsToRedeem > 0)
+            _summaryRow(
+                'Скидка баллами', '-${Product.formatPrice(_pointsValue)} сом',
+                isDiscount: true),
+          const Divider(height: S.x24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('К оплате',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
+              Text(
+                '${Product.formatPrice(_finalTotal)} сом',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, {bool isDiscount = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: S.x8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13, color: AppColors.textSecondary)),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: isDiscount ? Colors.green : AppColors.textPrimary)),
+        ],
       ),
     );
   }
@@ -63,12 +531,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(S.x20),
-            decoration: BoxDecoration(color: AppColors.surfaceElevated, borderRadius: BorderRadius.circular(R.lg)),
+            decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(R.lg)),
             child: Column(
               children: [
-                Text('К оплате', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                Text('К оплате',
+                    style: TextStyle(
+                        fontSize: 13, color: AppColors.textSecondary)),
                 const SizedBox(height: S.x4),
-                Text(widget.cart.formattedTotal, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                Text('${Product.formatPrice(_finalTotal)} сом',
+                    style: TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary)),
+                if (_pointsToRedeem > 0) ...[
+                  const SizedBox(height: S.x4),
+                  Text(
+                      'Скидка баллами: ${Product.formatPrice(_pointsValue)} сом',
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.green)),
+                ],
               ],
             ),
           ),
@@ -87,7 +570,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 // MBank header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: S.x16, vertical: S.x8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: S.x16, vertical: S.x8),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFF0D7C5F), Color(0xFF15A67E)],
@@ -99,9 +583,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.account_balance_rounded, color: Colors.white, size: 18),
+                      const Icon(Icons.account_balance_rounded,
+                          color: Colors.white, size: 18),
                       const SizedBox(width: S.x8),
-                      const Text('Mbank', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                      const Text('Mbank',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
@@ -117,7 +606,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     height: 220,
                     fit: BoxFit.contain,
                     errorBuilder: (_, _, _) => Container(
-                      width: 220, height: 220,
+                      width: 220,
+                      height: 220,
                       decoration: BoxDecoration(
                         color: AppColors.surfaceOverlay,
                         borderRadius: BorderRadius.circular(R.md),
@@ -125,9 +615,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.qr_code_2_rounded, size: 60, color: AppColors.textTertiary),
+                          Icon(Icons.qr_code_2_rounded,
+                              size: 60, color: AppColors.textTertiary),
                           const SizedBox(height: S.x8),
-                          Text('QR не найден', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                          Text('QR не найден',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textTertiary)),
                         ],
                       ),
                     ),
@@ -136,9 +630,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                 const SizedBox(height: S.x12),
 
-                Text('ТИМУР Т.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                Text('ТИМУР Т.',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary)),
                 const SizedBox(height: S.x2),
-                Text('+996 (999) 955 000', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                Text('+996 (999) 955 000',
+                    style: TextStyle(
+                        fontSize: 13, color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -149,16 +649,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(S.x16),
-            decoration: BoxDecoration(color: AppColors.surfaceElevated, borderRadius: BorderRadius.circular(R.lg)),
+            decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(R.lg)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('КАК ОПЛАТИТЬ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: AppColors.textTertiary)),
+                Text('КАК ОПЛАТИТЬ',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                        color: AppColors.textTertiary)),
                 const SizedBox(height: S.x12),
                 _instruction(1, 'Сделайте скриншот QR-кода выше'),
-                _instruction(2, 'Откройте Mbank или другое банковское приложение'),
+                _instruction(
+                    2, 'Откройте Mbank или другое банковское приложение'),
                 _instruction(3, 'Отсканируйте QR из галереи'),
-                _instruction(4, 'Переведите точную сумму: ${widget.cart.formattedTotal}'),
+                _instruction(4,
+                    'Переведите точную сумму: ${Product.formatPrice(_finalTotal)} сом'),
                 _instruction(5, 'Вернитесь сюда и прикрепите чек'),
               ],
             ),
@@ -168,7 +677,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           // CTA
           SizedBox(
-            width: double.infinity, height: 54,
+            width: double.infinity,
+            height: 54,
             child: ElevatedButton(
               onPressed: () => setState(() => _step = _Step.upload),
               child: const Text('Я ОПЛАТИЛ — ПРИКРЕПИТЬ ЧЕК'),
@@ -188,14 +698,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 22, height: 22,
-            decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Center(child: Text('$n', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent))),
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                shape: BoxShape.circle),
+            child: Center(
+                child: Text('$n',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent))),
           ),
           const SizedBox(width: S.x8),
-          Expanded(child: Padding(
+          Expanded(
+              child: Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text(text, style: TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.3)),
+            child: Text(text,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                    height: 1.3)),
           )),
         ],
       ),
@@ -212,9 +735,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           Icon(Icons.receipt_long_rounded, size: 40, color: AppColors.accent),
           const SizedBox(height: S.x16),
-          Text('Прикрепите чек оплаты', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text('Прикрепите чек оплаты',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary)),
           const SizedBox(height: S.x4),
-          Text('Скриншот или фото чека из банковского приложения', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          Text('Скриншот или фото чека из банковского приложения',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13, color: AppColors.textSecondary)),
 
           const SizedBox(height: S.x24),
 
@@ -233,11 +763,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.cloud_upload_outlined, size: 36, color: AppColors.textTertiary),
+                    Icon(Icons.cloud_upload_outlined,
+                        size: 36, color: AppColors.textTertiary),
                     const SizedBox(height: S.x12),
-                    Text('Нажмите чтобы загрузить', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                    Text('Нажмите чтобы загрузить',
+                        style: TextStyle(
+                            fontSize: 14, color: AppColors.textSecondary)),
                     const SizedBox(height: S.x4),
-                    Text('Скриншот или фото', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                    Text('Скриншот или фото',
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.textTertiary)),
                   ],
                 ),
               ),
@@ -246,12 +781,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             // Preview
             ClipRRect(
               borderRadius: BorderRadius.circular(R.lg),
-              child: Image.file(_proof!, width: double.infinity, height: 300, fit: BoxFit.cover),
+              child: Image.file(_proof!,
+                  width: double.infinity, height: 300, fit: BoxFit.cover),
             ),
             const SizedBox(height: S.x12),
             GestureDetector(
               onTap: _pickProof,
-              child: Text('Заменить фото', style: TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w500)),
+              child: Text('Заменить фото',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w500)),
             ),
           ],
 
@@ -261,12 +801,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(S.x12),
-            decoration: BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(R.sm)),
+            decoration: BoxDecoration(
+                color: AppColors.accentSoft,
+                borderRadius: BorderRadius.circular(R.sm)),
             child: Row(
               children: [
-                Icon(Icons.info_outline_rounded, size: 16, color: AppColors.accent),
+                Icon(Icons.info_outline_rounded,
+                    size: 16, color: AppColors.accent),
                 const SizedBox(width: S.x8),
-                Expanded(child: Text('Сумма перевода должна быть: ${widget.cart.formattedTotal}', style: TextStyle(fontSize: 12, color: AppColors.accent))),
+                Expanded(
+                    child: Text(
+                        'Сумма перевода должна быть: ${Product.formatPrice(_finalTotal)} сом',
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.accent))),
               ],
             ),
           ),
@@ -275,11 +822,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           // Submit
           SizedBox(
-            width: double.infinity, height: 54,
+            width: double.infinity,
+            height: 54,
             child: ElevatedButton(
               onPressed: _proof != null && !_isSubmitting ? _submit : null,
               child: _isSubmitting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Text('ОТПРАВИТЬ ЧЕК'),
             ),
           ),
@@ -291,7 +843,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             onTap: () => setState(() => _step = _Step.pay),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: S.x8),
-              child: Text('Назад к QR-коду', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+              child: Text('Назад к QR-коду',
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textTertiary)),
             ),
           ),
 
@@ -308,19 +862,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         margin: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x16),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(R.xl)),
+        decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(R.xl)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.photo_library_rounded, color: AppColors.accent),
-              title: Text('Из галереи', style: TextStyle(color: AppColors.textPrimary)),
+              leading:
+                  Icon(Icons.photo_library_rounded, color: AppColors.accent),
+              title: Text('Из галереи',
+                  style: TextStyle(color: AppColors.textPrimary)),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
             Divider(color: AppColors.divider, height: 0.5),
             ListTile(
-              leading: Icon(Icons.camera_alt_rounded, color: AppColors.accent),
-              title: Text('Сфотографировать', style: TextStyle(color: AppColors.textPrimary)),
+              leading:
+                  Icon(Icons.camera_alt_rounded, color: AppColors.accent),
+              title: Text('Сфотографировать',
+                  style: TextStyle(color: AppColors.textPrimary)),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             SizedBox(height: MediaQuery.of(ctx).padding.bottom),
@@ -347,23 +907,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final cartItems = widget.cart.items.map((item) => {
-        'product_id': item.product.id,
-        'quantity': item.quantity,
-        'size': item.selectedSize,
-        'color': item.selectedColor,
-      }).toList();
+      final cartItems = widget.cart.items
+          .map((item) => {
+                'product_id': item.product.id,
+                'quantity': item.quantity,
+                'size': item.selectedSize,
+                'color': item.selectedColor,
+              })
+          .toList();
+
+      final orderData = <String, dynamic>{
+        'items': cartItems,
+        'payment_method': 'mbank_qr',
+        'delivery_type': _deliveryType,
+      };
+
+      if (_pointsToRedeem > 0) {
+        orderData['points_to_redeem'] = _pointsToRedeem.toInt();
+      }
+
+      if (_deliveryType == 'pickup' && _selectedPickupLocation != null) {
+        orderData['pickup_location_name'] = _selectedPickupLocation!.name;
+        orderData['pickup_location_address'] =
+            _selectedPickupLocation!.address;
+      }
 
       final response = await ApiService.dio.post(
         '/api/v1/orders',
-        data: {
-          'items': cartItems,
-          'payment_method': 'mbank_qr',
-        },
+        data: orderData,
       );
 
       final data = response.data as Map<String, dynamic>;
-      _orderNumber = data['order_number'] as String? ?? data['id'] as String?;
+      _orderNumber =
+          data['order_number'] as String? ?? data['id'] as String?;
+
+      // Calculate cashback on the paid amount
+      final auth = context.read<AuthProvider>();
+      final cashbackPct = auth.loyalty?.cashbackPercent ?? 3;
+      _cashbackEarned = (_finalTotal * cashbackPct / 100).round();
 
       if (!mounted) return;
       setState(() {
@@ -373,6 +954,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       if (!mounted) return;
       // Fallback: still proceed to done step even if API fails (offline-first UX)
+      final auth = context.read<AuthProvider>();
+      final cashbackPct = auth.loyalty?.cashbackPercent ?? 3;
+      _cashbackEarned = (_finalTotal * cashbackPct / 100).round();
+
       setState(() {
         _isSubmitting = false;
         _step = _Step.done;
@@ -390,18 +975,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 72, height: 72,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.accent, const Color(0xFF7AB8F5)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                gradient: LinearGradient(
+                    colors: [AppColors.accent, const Color(0xFF7AB8F5)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_rounded, size: 36, color: Colors.white),
+              child:
+                  const Icon(Icons.check_rounded, size: 36, color: Colors.white),
             ),
             const SizedBox(height: S.x24),
-            Text('Чек отправлен', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            Text('Чек отправлен',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary)),
             if (_orderNumber != null) ...[
               const SizedBox(height: S.x4),
-              Text('Заказ $_orderNumber', style: TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w600)),
+              Text('Заказ $_orderNumber',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w600)),
             ],
             const SizedBox(height: S.x8),
             Text(
@@ -409,20 +1007,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ? 'Заказ принят локально. Мы синхронизируем его\nпри следующем подключении.'
                   : 'Мы проверим оплату и подтвердим заказ.\nОбычно это занимает до 15 минут.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.5),
+              style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  height: 1.5),
             ),
+            if (_pointsToRedeem > 0) ...[
+              const SizedBox(height: S.x12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: S.x16, vertical: S.x8),
+                decoration: BoxDecoration(
+                    color: AppColors.accentSoft,
+                    borderRadius: BorderRadius.circular(R.sm)),
+                child: Text(
+                  'Списано ${_pointsToRedeem.toInt()} баллов',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
             const SizedBox(height: S.x12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: S.x16, vertical: S.x8),
-              decoration: BoxDecoration(color: AppColors.goldSoft, borderRadius: BorderRadius.circular(R.sm)),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: S.x16, vertical: S.x8),
+              decoration: BoxDecoration(
+                  color: AppColors.goldSoft,
+                  borderRadius: BorderRadius.circular(R.sm)),
               child: Text(
-                'Баллы начислятся после подтверждения',
-                style: TextStyle(fontSize: 12, color: AppColors.gold, fontWeight: FontWeight.w500),
+                _cashbackEarned != null && _cashbackEarned! > 0
+                    ? 'Начислится $_cashbackEarned баллов после подтверждения'
+                    : 'Баллы начислятся после подтверждения',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.gold,
+                    fontWeight: FontWeight.w500),
               ),
             ),
             const SizedBox(height: S.x32),
             SizedBox(
-              width: double.infinity, height: 54,
+              width: double.infinity,
+              height: 54,
               child: ElevatedButton(
                 onPressed: () {
                   widget.cart.clear();

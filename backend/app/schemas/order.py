@@ -38,6 +38,9 @@ class OrderOut(BaseModel):
     confirmed_at: datetime | None = None
     shipped_at: datetime | None = None
     delivered_at: datetime | None = None
+    pickup_location_id: uuid.UUID | None = None
+    pickup_ready_at: datetime | None = None
+    ready_for_pickup_at: datetime | None = None
     created_at: datetime
     items: list[OrderItemOut] = []
 
@@ -52,11 +55,23 @@ class OrderCreate(BaseModel):
     try_at_home: bool = False
     points_used: int = 0
     promo_code: str | None = None
+    pickup_location_id: uuid.UUID | None = None
 
 
 class OrderStatusUpdate(BaseModel):
     status: str
     admin_notes: str | None = None
+
+
+class TimelineEntry(BaseModel):
+    status: str
+    timestamp: datetime
+    note: str
+
+
+class OrderTrackOut(BaseModel):
+    order: OrderOut
+    timeline: list[TimelineEntry]
 
 
 class AdminOrderOut(OrderOut):

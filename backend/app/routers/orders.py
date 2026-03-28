@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.dependencies import get_current_user, get_db
 from app.models.order import Order
 from app.models.user import Profile
-from app.schemas.order import OrderCreate, OrderOut
+from app.schemas.order import OrderCreate, OrderOut, OrderTrackOut, TimelineEntry
 from app.services.order_service import create_order_from_cart
 from app.services.upload_service import save_upload
 
@@ -33,6 +33,7 @@ async def create_order(
             try_at_home=body.try_at_home,
             points_used=body.points_used,
             promo_code=body.promo_code,
+            pickup_location_id=body.pickup_location_id,
         )
         await db.commit()
         return OrderOut.model_validate(order)
@@ -67,6 +68,59 @@ async def get_my_orders(
         "per_page": per_page,
         "pages": math.ceil(total / per_page) if per_page else 0,
     }
+
+
+@router.get("/{order_id}/track", response_model=OrderTrackOut)
+async def track_order(
+    order_id: uuid.UUID,
+    user: Profile = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.items))
+        .where(Order.id == order_id, Order.user_id == user.id)
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Build timeline from timestamp fields
+    timeline = []
+    timeline.append(TimelineEntry(
+        status="pending",
+        timestamp=order.created_at,
+        note="Заказ создан",
+    ))
+    if order.confirmed_at:
+        timeline.append(TimelineEntry(
+            status="payment_confirmed",
+            timestamp=order.confirmed_at,
+            note="Оплата подтверждена",
+        ))
+    if order.ready_for_pickup_at:
+        timeline.append(TimelineEntry(
+            status="ready_for_pickup",
+            timestamp=order.ready_for_pickup_at,
+            note="Готов к выдаче",
+        ))
+    if order.shipped_at:
+        timeline.append(TimelineEntry(
+            status="shipped",
+            timestamp=order.shipped_at,
+            note="Отправлен",
+        ))
+    if order.delivered_at:
+        timeline.append(TimelineEntry(
+            status="delivered",
+            timestamp=order.delivered_at,
+            note="Доставлен",
+        ))
+
+    return OrderTrackOut(
+        order=OrderOut.model_validate(order),
+        timeline=timeline,
+    )
 
 
 @router.get("/{order_id}", response_model=OrderOut)
