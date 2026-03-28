@@ -70,11 +70,21 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _tab = 0;
   bool _notificationsStarted = false;
+  bool _sessionChecked = false;
 
   @override
   Widget build(BuildContext context) {
-    // Start notification polling once the user logs in
     final auth = context.watch<AuthProvider>();
+
+    // Try to restore session on first build
+    if (!_sessionChecked) {
+      _sessionChecked = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        auth.tryRestoreSession();
+      });
+    }
+
+    // Start notification polling once the user logs in
     if (auth.isLoggedIn && !_notificationsStarted) {
       _notificationsStarted = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {

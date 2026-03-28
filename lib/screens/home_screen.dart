@@ -8,6 +8,7 @@ import '../models/loyalty.dart';
 import '../models/product.dart';
 import '../screens/product_detail_screen.dart';
 import '../services/api_service.dart';
+import '../screens/auth_screen.dart';
 import '../widgets/product_card.dart';
 
 /// Home screen following editorial e-commerce patterns:
@@ -118,18 +119,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       width: double.infinity,
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: () { HapticFeedback.mediumImpact(); auth.demoLogin(); },
+                        onPressed: () {
+                          HapticFeedback.mediumImpact();
+                          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen()));
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0033A0),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 1),
+                        ),
                         child: const Text('ВОЙТИ'),
                       ),
                     ),
                     const SizedBox(height: S.x12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: OutlinedButton(
-                        onPressed: () { HapticFeedback.lightImpact(); auth.demoLogin(); },
-                        child: const Text('ДЕМО'),
-                      ),
+                    TextButton(
+                      onPressed: () { HapticFeedback.lightImpact(); auth.demoLogin(); },
+                      child: Text('Попробовать демо', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                     ),
                   ],
                 ),
