@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     ADMIN_PHONE: str = "+996999955000"
     ADMIN_PASSWORD: str = "admin123"
+    QR_SECRET: str = "change-me-qr-secret"
 
     @property
     def cors_origins_list(self) -> list[str]:

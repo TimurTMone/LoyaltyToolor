@@ -153,6 +153,8 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _qrCard(BuildContext context, LoyaltyAccount l) {
+    final auth = context.watch<AuthProvider>();
+    final qrData = auth.qrToken ?? l.qrCode;
     return GestureDetector(
       onTap: () { HapticFeedback.lightImpact(); _showQR(context, l); },
       child: Container(
@@ -161,15 +163,27 @@ class ProfileScreen extends StatelessWidget {
         decoration: BoxDecoration(color: AppColors.surfaceElevated, borderRadius: BorderRadius.circular(R.lg)),
         child: Column(
           children: [
-            Text('НАЖМИТЕ ДЛЯ УВЕЛИЧЕНИЯ', style: TextStyle(fontSize: 9, letterSpacing: 1.5, color: AppColors.textTertiary, fontWeight: FontWeight.w500)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('НАЖМИТЕ ДЛЯ УВЕЛИЧЕНИЯ', style: TextStyle(fontSize: 9, letterSpacing: 1.5, color: AppColors.textTertiary, fontWeight: FontWeight.w500)),
+                const SizedBox(width: S.x8),
+                _ProfileQrPulseIndicator(),
+              ],
+            ),
             const SizedBox(height: S.x16),
             Container(
               padding: const EdgeInsets.all(S.x8),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(R.md)),
-              child: QrImageView(data: l.qrCode, version: QrVersions.auto, size: 140, backgroundColor: Colors.white),
+              child: auth.qrToken != null
+                  ? QrImageView(data: qrData, version: QrVersions.auto, size: 140, backgroundColor: Colors.white)
+                  : const SizedBox(width: 140, height: 140, child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))),
             ),
             const SizedBox(height: S.x12),
-            Text(l.qrCode, style: TextStyle(fontSize: 11, color: AppColors.textTertiary, letterSpacing: 1.5, fontWeight: FontWeight.w500)),
+            Text(
+              auth.qrToken != null ? 'QR обновляется автоматически' : 'Загрузка...',
+              style: TextStyle(fontSize: 11, color: AppColors.textTertiary, letterSpacing: 1.5, fontWeight: FontWeight.w500),
+            ),
           ],
         ),
       ),
@@ -180,24 +194,41 @@ class ProfileScreen extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x16),
-        padding: const EdgeInsets.symmetric(horizontal: S.x32, vertical: S.x32),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(R.xl)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('ПОКАЖИТЕ НА КАССЕ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2, color: AppColors.textSecondary)),
-            const SizedBox(height: S.x24),
-            Container(
-              padding: const EdgeInsets.all(S.x16),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(R.lg)),
-              child: QrImageView(data: l.qrCode, version: QrVersions.auto, size: 220, backgroundColor: Colors.white),
+      builder: (ctx) => Consumer<AuthProvider>(
+        builder: (ctx, auth, _) {
+          final qrData = auth.qrToken ?? l.qrCode;
+          return Container(
+            margin: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x16),
+            padding: const EdgeInsets.symmetric(horizontal: S.x32, vertical: S.x32),
+            decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(R.xl)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('ПОКАЖИТЕ НА КАССЕ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2, color: AppColors.textSecondary)),
+                    const SizedBox(width: S.x8),
+                    _ProfileQrPulseIndicator(),
+                  ],
+                ),
+                const SizedBox(height: S.x24),
+                Container(
+                  padding: const EdgeInsets.all(S.x16),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(R.lg)),
+                  child: auth.qrToken != null
+                      ? QrImageView(data: qrData, version: QrVersions.auto, size: 220, backgroundColor: Colors.white)
+                      : const SizedBox(width: 220, height: 220, child: Center(child: CircularProgressIndicator())),
+                ),
+                const SizedBox(height: S.x16),
+                Text(
+                  auth.qrToken != null ? 'QR обновляется автоматически' : 'Загрузка...',
+                  style: TextStyle(fontSize: 13, color: AppColors.textTertiary, letterSpacing: 2, fontWeight: FontWeight.w500),
+                ),
+              ],
             ),
-            const SizedBox(height: S.x16),
-            Text(l.qrCode, style: TextStyle(fontSize: 13, color: AppColors.textTertiary, letterSpacing: 2, fontWeight: FontWeight.w500)),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -524,6 +555,65 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: S.x16),
           Expanded(child: body),
         ]),
+      ),
+    );
+  }
+}
+
+/// A small pulsing dot that indicates the QR code is live/rotating.
+class _ProfileQrPulseIndicator extends StatefulWidget {
+  @override
+  State<_ProfileQrPulseIndicator> createState() =>
+      _ProfileQrPulseIndicatorState();
+}
+
+class _ProfileQrPulseIndicatorState extends State<_ProfileQrPulseIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.3, end: 1.0).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Text(
+            'LIVE',
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: Colors.green,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -255,6 +255,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // ─── Loyalty Card ────────────────────────────────────────────────
   Widget _loyaltyCard(BuildContext context, LoyaltyAccount loyalty) {
+    final auth = context.watch<AuthProvider>();
+    final qrData = auth.qrToken ?? loyalty.qrCode;
     final tc = _tierColor(loyalty.tier);
     return GestureDetector(
       onTap: () { HapticFeedback.lightImpact(); _showQR(context, loyalty); },
@@ -312,10 +314,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
             ),
             const SizedBox(width: S.x16),
-            Container(
-              padding: const EdgeInsets.all(S.x6),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(R.md)),
-              child: QrImageView(data: loyalty.qrCode, version: QrVersions.auto, size: 80, backgroundColor: Colors.white),
+            Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(S.x6),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(R.md)),
+                  child: auth.qrToken != null
+                      ? QrImageView(data: qrData, version: QrVersions.auto, size: 80, backgroundColor: Colors.white)
+                      : const SizedBox(width: 80, height: 80, child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))),
+                ),
+                const SizedBox(height: S.x4),
+                _QrPulseIndicator(),
+              ],
             ),
           ],
         ),
@@ -327,25 +337,42 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x16),
-        padding: const EdgeInsets.symmetric(horizontal: S.x32, vertical: S.x32),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(R.xl)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('ПОКАЖИТЕ НА КАССЕ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2, color: AppColors.textSecondary)),
-            const SizedBox(height: S.x24),
-            Container(
-              padding: const EdgeInsets.all(S.x16),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(R.lg)),
-              child: QrImageView(data: loyalty.qrCode, version: QrVersions.auto, size: 220, backgroundColor: Colors.white),
+      builder: (ctx) => Consumer<AuthProvider>(
+        builder: (ctx, auth, _) {
+          final qrData = auth.qrToken ?? loyalty.qrCode;
+          return Container(
+            margin: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x16),
+            padding: const EdgeInsets.symmetric(horizontal: S.x32, vertical: S.x32),
+            decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(R.xl)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('ПОКАЖИТЕ НА КАССЕ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2, color: AppColors.textSecondary)),
+                    const SizedBox(width: S.x8),
+                    _QrPulseIndicator(),
+                  ],
+                ),
+                const SizedBox(height: S.x24),
+                Container(
+                  padding: const EdgeInsets.all(S.x16),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(R.lg)),
+                  child: auth.qrToken != null
+                      ? QrImageView(data: qrData, version: QrVersions.auto, size: 220, backgroundColor: Colors.white)
+                      : const SizedBox(width: 220, height: 220, child: Center(child: CircularProgressIndicator())),
+                ),
+                const SizedBox(height: S.x16),
+                Text(
+                  auth.qrToken != null ? 'QR обновляется автоматически' : 'Загрузка...',
+                  style: TextStyle(fontSize: 13, color: AppColors.textTertiary, letterSpacing: 2, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: S.x8),
+              ],
             ),
-            const SizedBox(height: S.x16),
-            Text(loyalty.qrCode, style: TextStyle(fontSize: 13, color: AppColors.textTertiary, letterSpacing: 2, fontWeight: FontWeight.w500)),
-            const SizedBox(height: S.x8),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -458,4 +485,62 @@ class _BannerData {
   final String title, subtitle;
   final Color color;
   const _BannerData(this.title, this.subtitle, this.color);
+}
+
+/// A small pulsing dot that indicates the QR code is live/rotating.
+class _QrPulseIndicator extends StatefulWidget {
+  @override
+  State<_QrPulseIndicator> createState() => _QrPulseIndicatorState();
+}
+
+class _QrPulseIndicatorState extends State<_QrPulseIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.3, end: 1.0).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'LIVE',
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: Colors.green,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

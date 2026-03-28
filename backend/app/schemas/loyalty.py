@@ -32,3 +32,22 @@ class LoyaltyTransactionOut(BaseModel):
 class AdminLoyaltyAdjust(BaseModel):
     points_change: int
     description: str
+
+
+class QrScanRequest(BaseModel):
+    qr_token: str
+
+
+class QrScanCustomer(BaseModel):
+    name: str
+    phone: str
+    tier: str
+    points: int
+    total_spent: Decimal
+    cashback_percent: int
+
+
+class QrScanResponse(BaseModel):
+    valid: bool
+    reason: str | None = None
+    customer: QrScanCustomer | None = None

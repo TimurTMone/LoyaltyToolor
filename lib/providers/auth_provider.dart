@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/loyalty.dart';
@@ -10,11 +11,16 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // ── Rotating QR token ─────────────────────────────────────────────────
+  String? _qrToken;
+  Timer? _qrRefreshTimer;
+
   AppUser? get user => _user;
   LoyaltyAccount? get loyalty => _loyalty;
   bool get isLoggedIn => _isLoggedIn;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get qrToken => _qrToken;
 
   // ── Real auth ─────────────────────────────────────────────────────────
 
@@ -29,6 +35,7 @@ class AuthProvider extends ChangeNotifier {
       await fetchProfile();
       await fetchLoyalty();
       _isLoggedIn = true;
+      startQrRefresh();
     } catch (e) {
       _error = _extractErrorMessage(e);
       _isLoggedIn = false;
@@ -68,6 +75,7 @@ class AuthProvider extends ChangeNotifier {
       await fetchProfile();
       await fetchLoyalty();
       _isLoggedIn = true;
+      startQrRefresh();
     } catch (e) {
       _error = _extractErrorMessage(e);
       _isLoggedIn = false;
@@ -127,6 +135,43 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // ── Rotating QR token methods ──────────────────────────────────────────
+
+  /// Fetch a signed, rotating QR token from GET /api/v1/loyalty/me/qr.
+  /// Falls back to loyalty.qrCode on failure.
+  Future<void> fetchQrToken() async {
+    try {
+      final response = await ApiService.dio.get('/api/v1/loyalty/me/qr');
+      final data = response.data as Map<String, dynamic>;
+      _qrToken = data['qr_token'] as String?;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[AuthProvider] fetchQrToken error: $e');
+      // Fallback: use the static loyalty QR code if the rotating endpoint fails
+      if (_qrToken == null && _loyalty != null) {
+        _qrToken = _loyalty!.qrCode;
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Start periodic QR token refresh every 25 seconds (before the 30s expiry).
+  void startQrRefresh() {
+    stopQrRefresh();
+    // Fetch immediately, then repeat every 25 seconds
+    fetchQrToken();
+    _qrRefreshTimer = Timer.periodic(
+      const Duration(seconds: 25),
+      (_) => fetchQrToken(),
+    );
+  }
+
+  /// Cancel the QR refresh timer.
+  void stopQrRefresh() {
+    _qrRefreshTimer?.cancel();
+    _qrRefreshTimer = null;
+  }
+
   /// Try to restore session from stored tokens on app start.
   Future<void> tryRestoreSession() async {
     _isLoading = true;
@@ -138,6 +183,7 @@ class AuthProvider extends ChangeNotifier {
         await fetchProfile();
         await fetchLoyalty();
         _isLoggedIn = true;
+        startQrRefresh();
       }
     } catch (e) {
       debugPrint('[AuthProvider] tryRestoreSession error: $e');
@@ -234,12 +280,14 @@ class AuthProvider extends ChangeNotifier {
 
     _isLoggedIn = true;
     _error = null;
+    startQrRefresh();
     notifyListeners();
   }
 
   // ── Logout ────────────────────────────────────────────────────────────
 
   Future<void> logout() async {
+    stopQrRefresh();
     try {
       await ApiService.logout();
     } catch (e) {
@@ -247,6 +295,7 @@ class AuthProvider extends ChangeNotifier {
     }
     _user = null;
     _loyalty = null;
+    _qrToken = null;
     _isLoggedIn = false;
     _error = null;
     notifyListeners();

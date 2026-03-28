@@ -17,6 +17,7 @@ export const LOYALTY_TIERS = [
 
 export const NAV_ITEMS = [
   { href: "/", label: "Панель", icon: "LayoutDashboard" },
+  { href: "/scan", label: "Сканер QR", icon: "ScanLine" },
   { href: "/products", label: "Товары", icon: "Package" },
   { href: "/orders", label: "Заказы", icon: "ShoppingCart" },
   { href: "/users", label: "Пользователи", icon: "Users" },

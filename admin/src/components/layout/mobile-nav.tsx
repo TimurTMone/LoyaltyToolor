@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  ScanLine,
   Package,
   ShoppingCart,
   Users,
@@ -23,6 +24,7 @@ import {
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
+  ScanLine,
   Package,
   ShoppingCart,
   Users,

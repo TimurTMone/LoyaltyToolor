@@ -10,6 +10,7 @@ import {
   FolderTree,
   Ticket,
   MapPin,
+  ScanLine,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
+  ScanLine,
   Package,
   ShoppingCart,
   Users,
