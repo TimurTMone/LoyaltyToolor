@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 enum LocationType { store, storeSoon, vending, bus }
 
@@ -18,9 +19,39 @@ class ToolorLocation {
     this.hours,
     this.note,
   });
+
+  /// Parse a location from the API JSON response.
+  factory ToolorLocation.fromJson(Map<String, dynamic> json) {
+    final typeStr = (json['type'] as String? ?? 'store').toLowerCase();
+    final LocationType type;
+    switch (typeStr) {
+      case 'store':
+        type = LocationType.store;
+        break;
+      case 'store_soon':
+        type = LocationType.storeSoon;
+        break;
+      case 'vending':
+        type = LocationType.vending;
+        break;
+      case 'bus':
+        type = LocationType.bus;
+        break;
+      default:
+        type = LocationType.store;
+    }
+    return ToolorLocation(
+      name: json['name'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      type: type,
+      hours: json['hours'] as String?,
+      note: json['note'] as String?,
+    );
+  }
 }
 
-const toolorLocations = [
+/// Hardcoded fallback locations used when the API is unavailable.
+const _fallbackLocations = [
   ToolorLocation(
     name: 'TOOLOR AsiaMall',
     address: 'AsiaMall, 2 этаж, бутик 19(1)',
@@ -72,8 +103,54 @@ void showLocationsSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+    builder: (_) => _LocationsSheetContent(height: MediaQuery.of(context).size.height * 0.7),
+  );
+}
+
+class _LocationsSheetContent extends StatefulWidget {
+  final double height;
+  const _LocationsSheetContent({required this.height});
+
+  @override
+  State<_LocationsSheetContent> createState() => _LocationsSheetContentState();
+}
+
+class _LocationsSheetContentState extends State<_LocationsSheetContent> {
+  List<ToolorLocation> _locations = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLocations();
+  }
+
+  Future<void> _fetchLocations() async {
+    try {
+      final response = await ApiService.dio.get('/api/v1/locations');
+      final data = response.data;
+      final List<dynamic> items = data is List ? data : (data['items'] as List? ?? data as List);
+      if (!mounted) return;
+      setState(() {
+        _locations = items
+            .map((json) => ToolorLocation.fromJson(json as Map<String, dynamic>))
+            .toList();
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      // Fallback to hardcoded locations on API failure
+      setState(() {
+        _locations = _fallbackLocations.toList();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: widget.height,
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(R.xl)),
@@ -88,18 +165,20 @@ void showLocationsSheet(BuildContext context) {
           Text('Магазины, вендинг и мобильный шоурум', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
           const SizedBox(height: S.x16),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x24),
-              physics: const BouncingScrollPhysics(),
-              itemCount: toolorLocations.length,
-              separatorBuilder: (_, _) => const SizedBox(height: S.x8),
-              itemBuilder: (_, i) => _LocationTile(location: toolorLocations[i]),
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(S.x16, 0, S.x16, S.x24),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _locations.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: S.x8),
+                    itemBuilder: (_, i) => _LocationTile(location: _locations[i]),
+                  ),
           ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _LocationTile extends StatelessWidget {

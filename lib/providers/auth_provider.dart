@@ -1,18 +1,163 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/loyalty.dart';
+import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   AppUser? _user;
   LoyaltyAccount? _loyalty;
   bool _isLoggedIn = false;
+  bool _isLoading = false;
+  String? _error;
 
   AppUser? get user => _user;
   LoyaltyAccount? get loyalty => _loyalty;
   bool get isLoggedIn => _isLoggedIn;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
 
-  // Demo login for MVP
+  // ── Real auth ─────────────────────────────────────────────────────────
+
+  /// Login with phone + password via FastAPI backend.
+  Future<void> login(String phone, String password) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await ApiService.login(phone, password);
+      await fetchProfile();
+      await fetchLoyalty();
+      _isLoggedIn = true;
+    } catch (e) {
+      _error = _extractErrorMessage(e);
+      _isLoggedIn = false;
+      debugPrint('[AuthProvider] login error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Register a new account, then auto-login.
+  Future<void> register(String phone, String password, String name,
+      {String? referralCode}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await ApiService.dio.post(
+        '/api/v1/auth/register',
+        data: {
+          'phone': phone,
+          'password': password,
+          'full_name': name,
+          if (referralCode != null) 'referral_code': referralCode,
+        },
+      );
+
+      final data = response.data as Map<String, dynamic>;
+      final access = data['access_token'] as String?;
+      final refresh = data['refresh_token'] as String?;
+
+      if (access != null && refresh != null) {
+        await ApiService.setTokens(access, refresh);
+      }
+
+      await fetchProfile();
+      await fetchLoyalty();
+      _isLoggedIn = true;
+    } catch (e) {
+      _error = _extractErrorMessage(e);
+      _isLoggedIn = false;
+      debugPrint('[AuthProvider] register error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Fetch user profile from GET /api/v1/users/me.
+  Future<void> fetchProfile() async {
+    try {
+      final response = await ApiService.dio.get('/api/v1/users/me');
+      final data = response.data as Map<String, dynamic>;
+      _user = AppUser.fromJson(data);
+    } catch (e) {
+      debugPrint('[AuthProvider] fetchProfile error: $e');
+      rethrow;
+    }
+  }
+
+  /// Fetch loyalty account from GET /api/v1/loyalty/me.
+  Future<void> fetchLoyalty() async {
+    try {
+      final response = await ApiService.dio.get('/api/v1/loyalty/me');
+      final data = response.data as Map<String, dynamic>;
+      _loyalty = LoyaltyAccount.fromJson(data);
+
+      // Also fetch transactions and attach them
+      try {
+        final txnResponse =
+            await ApiService.dio.get('/api/v1/loyalty/me/transactions');
+        final txnData = txnResponse.data as Map<String, dynamic>;
+        final items = txnData['items'] as List<dynamic>? ?? [];
+        final transactions = items
+            .map((t) =>
+                LoyaltyTransaction.fromJson(t as Map<String, dynamic>))
+            .toList();
+
+        // Rebuild loyalty with transactions
+        _loyalty = LoyaltyAccount(
+          id: _loyalty!.id,
+          qrCode: _loyalty!.qrCode,
+          tier: _loyalty!.tier,
+          points: _loyalty!.points,
+          totalSpent: _loyalty!.totalSpent,
+          transactions: transactions,
+        );
+      } catch (e) {
+        debugPrint('[AuthProvider] fetchLoyalty transactions error: $e');
+        // Non-fatal: loyalty account still available without transactions
+      }
+    } catch (e) {
+      debugPrint('[AuthProvider] fetchLoyalty error: $e');
+      // Non-fatal during login — loyalty is secondary
+    }
+  }
+
+  /// Try to restore session from stored tokens on app start.
+  Future<void> tryRestoreSession() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final loggedIn = await ApiService.isLoggedIn();
+      if (loggedIn) {
+        await fetchProfile();
+        await fetchLoyalty();
+        _isLoggedIn = true;
+      }
+    } catch (e) {
+      debugPrint('[AuthProvider] tryRestoreSession error: $e');
+      // Token may be expired / invalid — clear and stay logged out
+      await ApiService.logout();
+      _isLoggedIn = false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Demo fallback ─────────────────────────────────────────────────────
+
+  /// Demo login for MVP — uses hardcoded data. Prefer login() for real auth.
   void demoLogin() {
+    debugPrint(
+        '[AuthProvider] WARNING: demoLogin() used — this is a fallback with '
+        'fake data. Use login(phone, password) for real authentication.');
+
     _user = AppUser(
       id: 'usr_001',
       name: 'Алия Садыкова',
@@ -88,13 +233,45 @@ class AuthProvider extends ChangeNotifier {
     );
 
     _isLoggedIn = true;
+    _error = null;
     notifyListeners();
   }
 
-  void logout() {
+  // ── Logout ────────────────────────────────────────────────────────────
+
+  Future<void> logout() async {
+    try {
+      await ApiService.logout();
+    } catch (e) {
+      debugPrint('[AuthProvider] logout error: $e');
+    }
     _user = null;
     _loyalty = null;
     _isLoggedIn = false;
+    _error = null;
     notifyListeners();
+  }
+
+  /// Clear the current error message.
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+
+  String _extractErrorMessage(dynamic e) {
+    if (e is Exception) {
+      // Try to extract backend detail from DioException
+      try {
+        final dynamic err = e;
+        final response = err.response;
+        if (response != null && response.data is Map) {
+          final detail = response.data['detail'];
+          if (detail is String) return detail;
+        }
+      } catch (_) {}
+    }
+    return e.toString();
   }
 }

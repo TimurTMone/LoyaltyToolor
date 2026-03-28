@@ -2,7 +2,6 @@
   "outputDirectory": "build/web",
   "buildCommand": "",
   "routes": [
-    { "src": "/api/img", "dest": "/api/img.js" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

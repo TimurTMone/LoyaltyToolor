@@ -5,9 +5,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../models/loyalty.dart';
-import '../data/toolor_products.dart';
 import '../models/product.dart';
 import '../screens/product_detail_screen.dart';
+import '../services/api_service.dart';
 import '../widgets/product_card.dart';
 
 /// Home screen following editorial e-commerce patterns:
@@ -25,10 +25,41 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late AnimationController _entryCtrl;
 
+  List<Product> _saleProducts = [];
+  List<Product> _newProducts = [];
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
     _entryCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..forward();
+    _fetchProducts();
+  }
+
+  Future<void> _fetchProducts() async {
+    try {
+      final response = await ApiService.dio.get(
+        '/api/v1/products',
+        queryParameters: {'per_page': 20},
+      );
+      final items = (response.data['items'] as List)
+          .map((json) => Product.fromJson(json as Map<String, dynamic>))
+          .where((p) => p.price > 0)
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _saleProducts = items.where((p) => p.originalPrice != null).take(8).toList();
+        _newProducts = items.take(10).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('[HomeScreen] Failed to fetch products: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -127,9 +158,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _home(BuildContext context, AuthProvider auth) {
     final loyalty = auth.loyalty;
     if (loyalty == null) return const SizedBox.shrink();
-    final valid = toolorProducts.where((p) => (p['price'] as num) > 0).toList();
-    final saleProducts = valid.where((p) => p['originalPrice'] != null).take(8).map((p) => Product.fromMap(p)).toList();
-    final newProducts = valid.take(10).map((p) => Product.fromMap(p)).toList();
+
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final saleProducts = _saleProducts;
+    final newProducts = _newProducts;
 
     return SafeArea(
       child: CustomScrollView(

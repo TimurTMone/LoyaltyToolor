@@ -60,7 +60,8 @@ INSERT INTO subcategories (category_id, name, slug, sort_order) VALUES
   ((SELECT id FROM categories WHERE slug = 'women'), 'Свитер',           'w-sweaters',     16),
   ((SELECT id FROM categories WHERE slug = 'women'), 'Водолазки',        'w-turtlenecks',  17),
   ((SELECT id FROM categories WHERE slug = 'women'), 'Лайтдаун',         'w-lightdown',    18),
-  ((SELECT id FROM categories WHERE slug = 'women'), 'Тренчи',           'w-trench',       19);
+  ((SELECT id FROM categories WHERE slug = 'women'), 'Зипки',            'w-zippers',      19),
+  ((SELECT id FROM categories WHERE slug = 'women'), 'Тренчи',           'w-trench',       20);
 
 -- Accessories subcategories
 INSERT INTO subcategories (category_id, name, slug, sort_order) VALUES

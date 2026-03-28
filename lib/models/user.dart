@@ -14,4 +14,28 @@ class AppUser {
     this.avatarUrl,
     this.birthDate,
   });
+
+  /// Create an AppUser from the FastAPI backend JSON response.
+  /// Maps `full_name` to `name`.
+  factory AppUser.fromJson(Map<String, dynamic> json) {
+    return AppUser(
+      id: json['id'] as String? ?? '',
+      name: json['full_name'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      email: json['email'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
+      birthDate: json['birth_date'] != null
+          ? DateTime.tryParse(json['birth_date'] as String)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'full_name': name,
+        'phone': phone,
+        'email': email,
+        'avatar_url': avatarUrl,
+        'birth_date': birthDate?.toIso8601String(),
+      };
 }

@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: toolor
+      POSTGRES_USER: toolor
+      POSTGRES_PASSWORD: toolor_secret
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql+asyncpg://toolor:toolor_secret@postgres:5432/toolor
+      JWT_SECRET: change-me-in-production-use-a-real-secret-key
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:3001","http://localhost:8080","http://localhost:5354","http://localhost:5355"]'
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./supabase:/supabase
+
+volumes:
+  pgdata:

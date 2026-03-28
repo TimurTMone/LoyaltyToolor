@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import '../services/api_service.dart' show apiBaseUrl;
 
 class Product {
   final String id;
@@ -54,11 +54,57 @@ class Product {
     }
   }
 
-  /// On web, proxy images through Vercel edge function to avoid CORS
+  /// Create a Product from the FastAPI backend JSON response.
+  /// Maps nested category/subcategory objects to their name strings.
+  static double _toDouble(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  static double? _toDoubleOrNull(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] as String? ?? 'Без названия',
+      price: _toDouble(json['price']),
+      originalPrice: _toDoubleOrNull(json['original_price']),
+      imageUrl: json['image_url'] as String? ?? '',
+      category: json['category_name'] as String?
+          ?? (json['category'] is Map ? json['category']['name'] as String? ?? '' : json['category']?.toString() ?? ''),
+      subcategory: json['subcategory_name'] as String?
+          ?? (json['subcategory'] is Map ? json['subcategory']['name'] as String? ?? '' : json['subcategory']?.toString() ?? ''),
+      description: json['description'] as String? ?? '',
+      sizes: (json['sizes'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      colors: (json['colors'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      stock: json['stock'] != null ? int.tryParse(json['stock'].toString()) : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'price': price,
+        'original_price': originalPrice,
+        'image_url': imageUrl,
+        'category': category,
+        'subcategory': subcategory,
+        'description': description,
+        'sizes': sizes,
+        'colors': colors,
+        'stock': stock,
+      };
+
   String get displayImageUrl {
-    if (kIsWeb && imageUrl.startsWith('https://toolorkg.com/wp-content/uploads/')) {
-      final path = imageUrl.replaceFirst('https://toolorkg.com/wp-content/uploads/', '');
-      return '/api/img?u=${Uri.encodeComponent(path)}';
+    if (imageUrl.startsWith('https://toolorkg.com/')) {
+      return '${apiBaseUrl}/api/v1/img?url=${Uri.encodeComponent(imageUrl)}';
     }
     return imageUrl;
   }

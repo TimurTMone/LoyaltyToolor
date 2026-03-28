@@ -1,0 +1,34 @@
+import uuid
+from datetime import datetime
+from decimal import Decimal
+
+from pydantic import BaseModel
+
+
+class LoyaltyAccountOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    qr_code: str
+    tier: str
+    points: int
+    total_spent: Decimal
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class LoyaltyTransactionOut(BaseModel):
+    id: uuid.UUID
+    type: str
+    amount: Decimal
+    points_change: int
+    description: str
+    order_id: uuid.UUID | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminLoyaltyAdjust(BaseModel):
+    points_change: int
+    description: str

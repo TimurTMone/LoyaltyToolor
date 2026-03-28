@@ -16,4 +16,12 @@ class CartItem {
   double get totalPrice => product.price * quantity;
 
   String get formattedTotal => '${Product.formatPrice(totalPrice)} сом';
+
+  /// Serialize cart item for syncing to the backend.
+  Map<String, dynamic> toJson() => {
+        'product_id': product.id,
+        'selected_size': selectedSize,
+        'selected_color': selectedColor,
+        'quantity': quantity,
+      };
 }

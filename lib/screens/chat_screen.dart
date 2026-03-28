@@ -4,10 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
-import '../data/toolor_products.dart';
 import '../models/product.dart';
 import '../models/loyalty.dart';
+import '../services/api_service.dart';
 import 'product_detail_screen.dart';
+
+// TODO: Connect chat to real AI/chat API endpoint (e.g. POST /api/v1/chat)
+// Currently uses local scripted responses with product data fetched from API.
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -105,30 +108,60 @@ class _ChatScreenState extends State<ChatScreen> {
     _handleInput(chip.toLowerCase());
   }
 
+  /// Fetch products from API with an optional search query, then filter locally.
+  Future<List<Product>> _fetchChatProducts({String? search, bool Function(Product)? filter}) async {
+    try {
+      final Map<String, dynamic> params = {'per_page': 10};
+      if (search != null) params['search'] = search;
+      final response = await ApiService.dio.get('/api/v1/products', queryParameters: params);
+      var items = (response.data['items'] as List)
+          .map((json) => Product.fromJson(json as Map<String, dynamic>))
+          .where((p) => p.price > 0)
+          .toList();
+      if (filter != null) items = items.where(filter).toList();
+      return items.take(4).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   void _handleInput(String input) {
     if (input.contains('скидк') || input.contains('sale') || input.contains('акци')) {
-      final sale = toolorProducts.where((p) => p['originalPrice'] != null).take(4).map((p) => Product.fromMap(p)).toList();
-      _addBot('Сейчас ${sale.length} товаров со скидкой до 40%! Вот лучшие:');
-      Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(sale));
+      _addBot('Ищу товары со скидками...');
+      _fetchChatProducts(filter: (p) => p.originalPrice != null).then((sale) {
+        if (!mounted) return;
+        if (sale.isNotEmpty) {
+          _addBot('Сейчас ${sale.length} товаров со скидкой до 40%! Вот лучшие:');
+          Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(sale));
+        } else {
+          _addBot('К сожалению, не удалось загрузить товары. Попробуйте позже.');
+        }
+      });
     } else if (input.contains('образ') || input.contains('подобр') || input.contains('стиль') || input.contains('outfit')) {
       _addBot('Какой стиль тебе ближе?');
       Future.delayed(const Duration(milliseconds: 700), () {
         _addChips(['🏙️ Городской', '🏔️ Outdoor', '💼 Деловой', '🎒 Casual']);
       });
     } else if (input.contains('городск') || input.contains('urban')) {
-      final urban = toolorProducts.where((p) {
-        final sub = p['subcategory'] as String;
-        return sub.contains('Куртк') || sub.contains('Брюк') || sub.contains('Свитш');
-      }).take(3).map((p) => Product.fromMap(p)).toList();
-      _addBot('Для города рекомендую — куртка + брюки + свитшот. Вот варианты:');
-      Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(urban));
+      _addBot('Для города рекомендую — куртка + брюки + свитшот. Ищу варианты...');
+      _fetchChatProducts(filter: (p) {
+        return p.subcategory.contains('Куртк') || p.subcategory.contains('Брюк') || p.subcategory.contains('Свитш');
+      }).then((urban) {
+        if (!mounted) return;
+        if (urban.isNotEmpty) {
+          _addProductCards(urban);
+        }
+      });
     } else if (input.contains('outdoor') || input.contains('горн')) {
-      final out = toolorProducts.where((p) {
-        final sub = p['subcategory'] as String;
-        return sub.contains('Пуховик') || sub.contains('Флис') || sub.contains('Ветровк');
-      }).take(3).map((p) => Product.fromMap(p)).toList();
-      _addBot('Для outdoor — пуховик или ветровка + флис. Вот что есть:');
-      Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(out));
+      _addBot('Для outdoor — пуховик или ветровка + флис. Ищу...');
+      _fetchChatProducts(filter: (p) {
+        return p.subcategory.contains('Пуховик') || p.subcategory.contains('Флис') || p.subcategory.contains('Ветровк');
+      }).then((out) {
+        if (!mounted) return;
+        if (out.isNotEmpty) {
+          _addProductCards(out);
+        }
+      });
     } else if (input.contains('балл') || input.contains('лояльн') || input.contains('кэшбэк') || input.contains('cashback') || input.contains('point')) {
       final auth = context.read<AuthProvider>();
       final l = auth.loyalty;
@@ -151,19 +184,25 @@ class _ChatScreenState extends State<ChatScreen> {
     } else if (RegExp(r'\d{2,3}\s*(см)?,?\s*\d{2,3}\s*(кг)?').hasMatch(input)) {
       _addBot('Для роста ~175 и веса ~70 рекомендую размер M в верхней одежде и M-L в брюках.\n\nНо лучше всего — примерка в нашем бутике! AsiaMall, 2 этаж, бутик 19(1) 📍');
     } else if (input.contains('деловой') || input.contains('бизнес') || input.contains('💼')) {
-      final biz = toolorProducts.where((p) {
-        final sub = p['subcategory'] as String;
-        return sub.contains('Рубашк') || sub.contains('Брюк');
-      }).take(3).map((p) => Product.fromMap(p)).toList();
-      _addBot('Деловой стиль — рубашка + брюки. Вот подборка:');
-      Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(biz));
+      _addBot('Деловой стиль — рубашка + брюки. Ищу подборку...');
+      _fetchChatProducts(filter: (p) {
+        return p.subcategory.contains('Рубашк') || p.subcategory.contains('Брюк');
+      }).then((biz) {
+        if (!mounted) return;
+        if (biz.isNotEmpty) {
+          _addProductCards(biz);
+        }
+      });
     } else if (input.contains('casual') || input.contains('🎒')) {
-      final cas = toolorProducts.where((p) {
-        final sub = p['subcategory'] as String;
-        return sub.contains('Худи') || sub.contains('Футболк') || sub.contains('Шорты');
-      }).take(3).map((p) => Product.fromMap(p)).toList();
       _addBot('Casual vibes — худи + футболка + шорты:');
-      Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(cas));
+      _fetchChatProducts(filter: (p) {
+        return p.subcategory.contains('Худи') || p.subcategory.contains('Футболк') || p.subcategory.contains('Шорты');
+      }).then((cas) {
+        if (!mounted) return;
+        if (cas.isNotEmpty) {
+          Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(cas));
+        }
+      });
     } else if (input.contains('привет') || input.contains('здравствуй') || input.contains('hello') || input.contains('hi')) {
       _addBot('Привет! Чем могу помочь? 😊');
       Future.delayed(const Duration(milliseconds: 700), () {

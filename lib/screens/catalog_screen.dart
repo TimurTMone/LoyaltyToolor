@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../data/toolor_products.dart';
 import '../models/product.dart';
+import '../services/api_service.dart';
 import '../widgets/product_card.dart';
 import 'product_detail_screen.dart';
 
@@ -20,41 +21,146 @@ class CatalogScreen extends StatefulWidget {
 class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
   final _searchCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
   String _query = '';
   String? _sub;
 
   final _cats = ['Все', ProductCategory.women, ProductCategory.men, ProductCategory.accessories, ProductCategory.sale];
 
+  List<Product> _products = [];
+  List<Map<String, dynamic>> _apiCategories = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  int _currentPage = 1;
+  int _totalPages = 1;
+
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: _cats.length, vsync: this);
-    _tabCtrl.addListener(() { if (!_tabCtrl.indexIsChanging) setState(() => _sub = null); });
+    _tabCtrl.addListener(() {
+      if (!_tabCtrl.indexIsChanging) {
+        setState(() => _sub = null);
+        _fetchProducts(reset: true);
+      }
+    });
+    _scrollCtrl.addListener(_onScroll);
+    _fetchCategories();
+    _fetchProducts(reset: true);
   }
 
   @override
-  void dispose() { _tabCtrl.dispose(); _searchCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _tabCtrl.dispose();
+    _searchCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
-  List<Product> _products() {
-    var list = toolorProducts.where((p) => (p['price'] as num) > 0).toList();
-    final cat = _cats[_tabCtrl.index];
-    if (cat != 'Все') {
-      list = cat == ProductCategory.sale
-          ? list.where((p) => p['originalPrice'] != null).toList()
-          : list.where((p) => p['category'] == cat).toList();
+  void _onScroll() {
+    if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
+      _loadMore();
     }
-    if (_sub != null) list = list.where((p) => p['subcategory'] == _sub).toList();
-    if (_query.isNotEmpty) {
-      final q = _query.toLowerCase();
-      list = list.where((p) => (p['name'] as String).toLowerCase().contains(q)).toList();
+  }
+
+  Future<void> _fetchCategories() async {
+    try {
+      final response = await ApiService.dio.get('/api/v1/products/categories');
+      if (!mounted) return;
+      setState(() {
+        _apiCategories = (response.data as List).cast<Map<String, dynamic>>();
+      });
+    } catch (_) {
+      // Categories fetch failed — subcategory chips will be empty
     }
-    return list.map((p) => Product.fromMap(p)).toList();
+  }
+
+  Future<void> _fetchProducts({bool reset = false}) async {
+    if (reset) {
+      setState(() {
+        _currentPage = 1;
+        _isLoading = true;
+      });
+    }
+
+    try {
+      final cat = _cats[_tabCtrl.index];
+      final Map<String, dynamic> params = {
+        'per_page': 20,
+        'page': _currentPage,
+      };
+
+      if (_query.isNotEmpty) {
+        params['search'] = _query;
+      }
+
+      // Map category tab to API category_id if available
+      if (cat != 'Все' && cat != ProductCategory.sale) {
+        final match = _apiCategories.where((c) => c['name'] == cat);
+        if (match.isNotEmpty) {
+          params['category_id'] = match.first['id'];
+        }
+      }
+
+      final response = await ApiService.dio.get(
+        '/api/v1/products',
+        queryParameters: params,
+      );
+
+      final data = response.data;
+      var items = (data['items'] as List)
+          .map((json) => Product.fromJson(json as Map<String, dynamic>))
+          .where((p) => p.price > 0)
+          .toList();
+
+      // Client-side filtering for sale tab and subcategory
+      if (cat == ProductCategory.sale) {
+        items = items.where((p) => p.originalPrice != null).toList();
+      }
+      if (_sub != null) {
+        items = items.where((p) => p.subcategory == _sub).toList();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        if (reset) {
+          _products = items;
+        } else {
+          _products.addAll(items);
+        }
+        _totalPages = data['pages'] as int? ?? 1;
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || _currentPage >= _totalPages) return;
+    _isLoadingMore = true;
+    _currentPage++;
+    await _fetchProducts();
   }
 
   List<String> _subs() {
     final cat = _cats[_tabCtrl.index];
     if (cat == 'Все' || cat == ProductCategory.sale) return [];
-    return toolorProducts.where((p) => p['category'] == cat).map((p) => p['subcategory'] as String).toSet().toList()..sort();
+    // Derive subcategories from API categories data
+    final match = _apiCategories.where((c) => c['name'] == cat);
+    if (match.isNotEmpty) {
+      final subcats = match.first['subcategories'] as List?;
+      if (subcats != null) {
+        return subcats.map((s) => s['name'] as String).toList()..sort();
+      }
+    }
+    // Fallback: derive from loaded products
+    return _products.map((p) => p.subcategory).where((s) => s.isNotEmpty).toSet().toList()..sort();
   }
 
   @override
@@ -67,14 +173,17 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
             padding: const EdgeInsets.fromLTRB(S.x16, S.x8, S.x16, 0),
             child: TextField(
               controller: _searchCtrl,
-              onChanged: (v) => setState(() => _query = v),
+              onChanged: (v) {
+                setState(() => _query = v);
+                _fetchProducts(reset: true);
+              },
               style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Поиск',
                 prefixIcon: Icon(Icons.search_rounded, color: AppColors.textTertiary, size: 20),
                 suffixIcon: _query.isNotEmpty
                     ? GestureDetector(
-                        onTap: () { _searchCtrl.clear(); setState(() => _query = ''); },
+                        onTap: () { _searchCtrl.clear(); setState(() => _query = ''); _fetchProducts(reset: true); },
                         child: Icon(Icons.close_rounded, color: AppColors.textTertiary, size: 18),
                       )
                     : null,
@@ -121,7 +230,7 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
                     return Padding(
                       padding: const EdgeInsets.only(right: S.x6),
                       child: GestureDetector(
-                        onTap: () { HapticFeedback.selectionClick(); setState(() => _sub = val); },
+                        onTap: () { HapticFeedback.selectionClick(); setState(() => _sub = val); _fetchProducts(reset: true); },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           padding: const EdgeInsets.symmetric(horizontal: S.x12, vertical: S.x6),
@@ -147,59 +256,52 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
           ),
 
           // Product count
-          AnimatedBuilder(
-            animation: _tabCtrl,
-            builder: (_, _) {
-              final count = _products().length;
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(S.x16, S.x8, S.x16, S.x4),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('$count товаров', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                ),
-              );
-            },
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.x16, S.x8, S.x16, S.x4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('${_products.length} товаров', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+            ),
           ),
 
           // Grid
           Expanded(
-            child: AnimatedBuilder(
-              animation: _tabCtrl,
-              builder: (_, _) {
-                final prods = _products();
-                if (prods.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.search_off_rounded, size: 40, color: AppColors.textTertiary.withValues(alpha: 0.4)),
-                        const SizedBox(height: S.x12),
-                        Text('Ничего не найдено', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-                      ],
-                    ),
-                  );
-                }
-                return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(S.x16, S.x8, S.x16, S.x24),
-                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.56,
-                    crossAxisSpacing: S.x12,
-                    mainAxisSpacing: S.x20,
-                  ),
-                  itemCount: prods.length,
-                  itemBuilder: (_, i) {
-                    final p = prods[i];
-                    return ProductCard(
-                      product: p,
-                      heroTag: 'cat_${p.id}',
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: p, heroTag: 'cat_${p.id}'))),
-                    );
-                  },
-                );
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _products.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded, size: 40, color: AppColors.textTertiary.withValues(alpha: 0.4)),
+                            const SizedBox(height: S.x12),
+                            Text('Ничего не найдено', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
+                        controller: _scrollCtrl,
+                        padding: const EdgeInsets.fromLTRB(S.x16, S.x8, S.x16, S.x24),
+                        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.56,
+                          crossAxisSpacing: S.x12,
+                          mainAxisSpacing: S.x20,
+                        ),
+                        itemCount: _products.length + (_isLoadingMore ? 2 : 0),
+                        itemBuilder: (_, i) {
+                          if (i >= _products.length) {
+                            return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(strokeWidth: 2)));
+                          }
+                          final p = _products[i];
+                          return ProductCard(
+                            product: p,
+                            heroTag: 'cat_${p.id}',
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: p, heroTag: 'cat_${p.id}'))),
+                          );
+                        },
+                      ),
           ),
         ],
       ),

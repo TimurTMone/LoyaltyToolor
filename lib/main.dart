@@ -11,12 +11,12 @@ import 'screens/catalog_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/chat_screen.dart';
-import 'services/supabase_service.dart';
+import 'services/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  await SupabaseService.initialize();
+  await ApiService.init();
   runApp(const ToolorApp());
 }
 
