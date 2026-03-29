@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "admin123"
     QR_SECRET: str = "change-me-qr-secret"
     SENTRY_DSN: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    MIXPANEL_TOKEN: str = ""
 
     @property
     def cors_origins_list(self) -> list[str]:

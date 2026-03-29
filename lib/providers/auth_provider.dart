@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/loyalty.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   AppUser? _user;
@@ -59,6 +60,9 @@ class AuthProvider extends ChangeNotifier {
 
     _isLoggedIn = true;
     startQrRefresh();
+    if (_user != null) {
+      Analytics.identify(_user!.id, phone: _user!.phone, name: _user!.name, tier: _loyalty?.tierName);
+    }
     _isLoading = false;
     notifyListeners();
   }
@@ -114,6 +118,9 @@ class AuthProvider extends ChangeNotifier {
 
     _isLoggedIn = true;
     startQrRefresh();
+    if (_user != null) {
+      Analytics.identify(_user!.id, phone: _user!.phone, name: _user!.name, tier: _loyalty?.tierName);
+    }
     _isLoading = false;
     notifyListeners();
   }
@@ -325,6 +332,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('[AuthProvider] logout error: $e');
     }
+    Analytics.reset();
     _user = null;
     _loyalty = null;
     _qrToken = null;

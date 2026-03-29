@@ -14,6 +14,7 @@ from app.services.auth_service import (
     verify_token,
 )
 from app.services.loyalty_service import check_birthday_reward
+from app.services.analytics_service import track_signup, track_login
 
 router = APIRouter()
 
@@ -37,6 +38,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         db, body.phone, body.password, body.full_name, referred_by
     )
     await db.commit()
+    track_signup(str(user.id), body.phone, body.referral_code)
     return TokenResponse(
         access_token=create_access_token(user),
         refresh_token=create_refresh_token(user),
@@ -60,6 +62,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
             await check_birthday_reward(db, user, loyalty)
             await db.commit()
 
+    track_login(str(user.id))
     return TokenResponse(
         access_token=create_access_token(user),
         refresh_token=create_refresh_token(user),

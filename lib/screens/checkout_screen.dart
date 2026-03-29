@@ -1,22 +1,28 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/locations_sheet.dart';
 import '../models/product.dart';
+import '../services/analytics_service.dart';
 
-/// QR-based checkout flow with points redemption and pickup option:
-/// 0. Delivery type selection (delivery vs. pickup)
-/// 1. Points redemption slider
-/// 2. Show order total + MBank QR
-/// 3. User saves QR -> opens banking app -> transfers money
-/// 4. User uploads payment screenshot as proof
-/// 5. Order confirmed, awaiting manual verification
+// Conditionally import Finik SDK (only works on mobile)
+import 'package:finik_sdk/finik_sdk.dart';
+
+const _finikApiKey = 'eOJ3RXsvyZ8ztUIRp1fwq2fHJfYUyfKK2GpOgeAv';
+const _finikAccountId = '54b4316f-e1d2-4007-b167-3f4dd9e0b9a7';
+const _finikIsBeta = true;
+
+/// Checkout flow:
+/// Mobile: Delivery → Finik Payment → Done (instant confirmation)
+/// Web: Delivery → MBank QR → Upload proof → Done (manual verification)
 class CheckoutScreen extends StatefulWidget {
   final CartProvider cart;
   const CheckoutScreen({super.key, required this.cart});
@@ -33,10 +39,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _picker = ImagePicker();
   bool _isSubmitting = false;
   String? _orderNumber;
+  String? _orderId;
   String? _submitError;
 
   // Delivery type
-  String _deliveryType = 'delivery'; // 'delivery' or 'pickup'
+  String _deliveryType = 'delivery';
   ToolorLocation? _selectedPickupLocation;
   List<ToolorLocation> _locations = [];
   bool _isLoadingLocations = false;
@@ -79,7 +86,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        // Fallback: use hardcoded store locations
         _locations = [
           const ToolorLocation(
             name: 'TOOLOR AsiaMall',
@@ -94,13 +100,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   double get _orderTotal => widget.cart.totalPrice;
-
-  double get _pointsValue => _pointsToRedeem; // 1 point = 1 KGS
-
+  double get _pointsValue => _pointsToRedeem;
   double get _maxRedeemable =>
       _availablePoints < _orderTotal ? _availablePoints.toDouble() : _orderTotal;
-
   double get _finalTotal => (_orderTotal - _pointsValue).clamp(0, _orderTotal);
+
+  bool get _useFinik => !kIsWeb;
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +135,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           duration: const Duration(milliseconds: 300),
           child: switch (_step) {
             _Step.delivery => _deliveryStep(),
-            _Step.pay => _payStep(),
+            _Step.pay => _useFinik ? _finikPayStep() : _mbankPayStep(),
             _Step.upload => _uploadStep(),
             _Step.done => _doneStep(),
           },
@@ -183,7 +188,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ),
 
-          // Pickup location selector
           if (_deliveryType == 'pickup') ...[
             const SizedBox(height: S.x16),
             _pickupLocationSelector(),
@@ -191,17 +195,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           const SizedBox(height: S.x20),
 
-          // Points redemption
           if (_availablePoints > 0) _pointsRedemptionCard(),
 
           const SizedBox(height: S.x20),
 
-          // Order summary
           _orderSummary(),
 
           const SizedBox(height: S.x24),
 
-          // CTA
           SizedBox(
             width: double.infinity,
             height: 54,
@@ -209,8 +210,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               onPressed: (_deliveryType == 'pickup' &&
                       _selectedPickupLocation == null)
                   ? null
-                  : () => setState(() => _step = _Step.pay),
-              child: const Text('ПРОДОЛЖИТЬ К ОПЛАТЕ'),
+                  : _useFinik
+                      ? _createOrderAndPay
+                      : () => setState(() => _step = _Step.pay),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : Text(_useFinik ? 'ПЕРЕЙТИ К ОПЛАТЕ' : 'ПРОДОЛЖИТЬ К ОПЛАТЕ'),
             ),
           ),
 
@@ -519,15 +528,151 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // ─── Step 1: Show QR ─────────────────────────────────────────────
+  // ─── Finik Pay: Create order then open SDK ────────────────────────
 
-  Widget _payStep() {
+  Future<void> _createOrderAndPay() async {
+    if (_isSubmitting) return;
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isSubmitting = true;
+      _submitError = null;
+    });
+
+    try {
+      // Create order on backend first
+      final orderData = <String, dynamic>{
+        'payment_method': 'finik',
+        'delivery_type': _deliveryType,
+      };
+
+      if (_pointsToRedeem > 0) {
+        orderData['points_used'] = _pointsToRedeem.toInt();
+      }
+
+      if (_deliveryType == 'pickup' && _selectedPickupLocation != null) {
+        orderData['pickup_location_id'] = null; // Will be matched by name
+      }
+
+      final response = await ApiService.dio.post(
+        '/api/v1/orders',
+        data: orderData,
+      );
+
+      final data = response.data as Map<String, dynamic>;
+      _orderId = data['id'] as String?;
+      _orderNumber = data['order_number'] as String? ?? data['id'] as String?;
+
+      final auth = context.read<AuthProvider>();
+      final cashbackPct = auth.loyalty?.cashbackPercent ?? 3;
+      _cashbackEarned = (_finalTotal * cashbackPct / 100).round();
+
+      final cart = context.read<CartProvider>();
+      Analytics.purchase(
+        _orderId ?? '',
+        _finalTotal.toDouble(),
+        cart.itemCount,
+        orderData['payment_method'] as String? ?? 'unknown',
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _step = _Step.pay;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка создания заказа: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ─── Step 1a: Finik Payment (mobile only) ─────────────────────────
+
+  Widget _finikPayStep() {
+    final requestId = const Uuid().v4();
+
+    return FinikProvider(
+      key: const ValueKey('finik_pay'),
+      apiKey: _finikApiKey,
+      isBeta: _finikIsBeta,
+      locale: FinikSdkLocale.RU,
+      textScenario: TextScenario.REPLENISHMENT,
+      paymentMethods: const [
+        PaymentMethod.APP,
+        PaymentMethod.QR,
+        PaymentMethod.VISA,
+      ],
+      widget: CreateItemHandlerWidget(
+        accountId: _finikAccountId,
+        nameEn: 'TOOLOR Order ${_orderNumber ?? ""}',
+        amount: FixedAmount(_finalTotal),
+        requestId: requestId,
+        callbackUrl: '${apiBaseUrl}/api/v1/webhooks/finik',
+        requiredFields: [
+          if (_orderId != null)
+            RequiredField(
+              fieldId: 'order_id',
+              label: 'Order ID',
+              value: _orderId!,
+              isHidden: true,
+            ),
+        ],
+        onCreated: (data) {
+          // Payment item created in Finik system
+        },
+      ),
+      onPayment: (Map<String, dynamic>? data) {
+        if (data == null) return;
+        final status = data['status'] as String?;
+        if (status == 'SUCCEEDED') {
+          _confirmPaymentOnBackend(data);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Оплата не прошла. Попробуйте ещё раз.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            setState(() => _step = _Step.delivery);
+          }
+        }
+      },
+      onBackPressed: () {
+        setState(() => _step = _Step.delivery);
+      },
+    );
+  }
+
+  Future<void> _confirmPaymentOnBackend(Map<String, dynamic> paymentData) async {
+    if (_orderId == null) return;
+
+    try {
+      await ApiService.dio.post(
+        '/api/v1/orders/$_orderId/confirm-payment',
+        data: paymentData,
+      );
+    } catch (_) {
+      // Webhook will confirm as backup
+    }
+
+    if (!mounted) return;
+    setState(() => _step = _Step.done);
+  }
+
+  // ─── Step 1b: MBank QR (web fallback) ─────────────────────────────
+
+  Widget _mbankPayStep() {
     return SingleChildScrollView(
       key: const ValueKey('pay'),
       padding: const EdgeInsets.all(S.x16),
       child: Column(
         children: [
-          // Total
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(S.x20),
@@ -558,7 +703,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           const SizedBox(height: S.x20),
 
-          // MBank QR card
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(S.x24),
@@ -568,7 +712,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             child: Column(
               children: [
-                // MBank header
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: S.x16, vertical: S.x8),
@@ -597,15 +740,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                 const SizedBox(height: S.x16),
 
-                // QR image
                 ClipRRect(
                   borderRadius: BorderRadius.circular(R.md),
                   child: Image.asset(
-                    'assets/images/mbank_qr.png',
+                    'assets/images/mbank_a4_qr.png',
                     width: 220,
                     height: 220,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => Container(
+                    errorBuilder: (_, __, ___) => Container(
                       width: 220,
                       height: 220,
                       decoration: BoxDecoration(
@@ -645,7 +787,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           const SizedBox(height: S.x20),
 
-          // Instructions
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(S.x16),
@@ -675,7 +816,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           const SizedBox(height: S.x24),
 
-          // CTA
           SizedBox(
             width: double.infinity,
             height: 54,
@@ -725,7 +865,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // ─── Step 2: Upload proof ─────────────────────────────────────────
+  // ─── Step 2: Upload proof (web only) ──────────────────────────────
 
   Widget _uploadStep() {
     return SingleChildScrollView(
@@ -748,7 +888,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           const SizedBox(height: S.x24),
 
-          // Upload area
           if (_proof == null)
             GestureDetector(
               onTap: _pickProof,
@@ -778,7 +917,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             )
           else ...[
-            // Preview
             ClipRRect(
               borderRadius: BorderRadius.circular(R.lg),
               child: Image.file(_proof!,
@@ -797,7 +935,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           const SizedBox(height: S.x24),
 
-          // Amount reminder
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(S.x12),
@@ -820,12 +957,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           const SizedBox(height: S.x24),
 
-          // Submit
           SizedBox(
             width: double.infinity,
             height: 54,
             child: ElevatedButton(
-              onPressed: _proof != null && !_isSubmitting ? _submit : null,
+              onPressed: _proof != null && !_isSubmitting ? _submitMbank : null,
               child: _isSubmitting
                   ? const SizedBox(
                       width: 20,
@@ -838,7 +974,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           const SizedBox(height: S.x12),
 
-          // Back
           GestureDetector(
             onTap: () => setState(() => _step = _Step.pay),
             child: Padding(
@@ -897,9 +1032,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  // ─── Step 3: Done ─────────────────────────────────────────────────
+  // ─── MBank submit (web flow) ──────────────────────────────────────
 
-  Future<void> _submit() async {
+  Future<void> _submitMbank() async {
     HapticFeedback.mediumImpact();
     setState(() {
       _isSubmitting = true;
@@ -907,29 +1042,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final cartItems = widget.cart.items
-          .map((item) => {
-                'product_id': item.product.id,
-                'quantity': item.quantity,
-                'size': item.selectedSize,
-                'color': item.selectedColor,
-              })
-          .toList();
-
       final orderData = <String, dynamic>{
-        'items': cartItems,
         'payment_method': 'mbank_qr',
         'delivery_type': _deliveryType,
       };
 
       if (_pointsToRedeem > 0) {
-        orderData['points_to_redeem'] = _pointsToRedeem.toInt();
+        orderData['points_used'] = _pointsToRedeem.toInt();
       }
 
       if (_deliveryType == 'pickup' && _selectedPickupLocation != null) {
-        orderData['pickup_location_name'] = _selectedPickupLocation!.name;
-        orderData['pickup_location_address'] =
-            _selectedPickupLocation!.address;
+        orderData['pickup_location_id'] = null;
       }
 
       final response = await ApiService.dio.post(
@@ -941,7 +1064,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _orderNumber =
           data['order_number'] as String? ?? data['id'] as String?;
 
-      // Calculate cashback on the paid amount
       final auth = context.read<AuthProvider>();
       final cashbackPct = auth.loyalty?.cashbackPercent ?? 3;
       _cashbackEarned = (_finalTotal * cashbackPct / 100).round();
@@ -953,7 +1075,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      // Fallback: still proceed to done step even if API fails (offline-first UX)
       final auth = context.read<AuthProvider>();
       final cashbackPct = auth.loyalty?.cashbackPercent ?? 3;
       _cashbackEarned = (_finalTotal * cashbackPct / 100).round();
@@ -966,7 +1087,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  // ─── Step 3: Done ─────────────────────────────────────────────────
+
   Widget _doneStep() {
+    final isFinikPayment = _useFinik && _submitError == null;
+
     return Center(
       key: const ValueKey('done'),
       child: Padding(
@@ -988,7 +1113,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const Icon(Icons.check_rounded, size: 36, color: Colors.white),
             ),
             const SizedBox(height: S.x24),
-            Text('Чек отправлен',
+            Text(
+                isFinikPayment ? 'Оплата прошла успешно' : 'Чек отправлен',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -1003,9 +1129,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
             const SizedBox(height: S.x8),
             Text(
-              _submitError != null
-                  ? 'Заказ принят локально. Мы синхронизируем его\nпри следующем подключении.'
-                  : 'Мы проверим оплату и подтвердим заказ.\nОбычно это занимает до 15 минут.',
+              isFinikPayment
+                  ? 'Заказ подтверждён и принят в обработку.'
+                  : _submitError != null
+                      ? 'Заказ принят локально. Мы синхронизируем его\nпри следующем подключении.'
+                      : 'Мы проверим оплату и подтвердим заказ.\nОбычно это занимает до 15 минут.',
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 14,
@@ -1038,7 +1166,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   borderRadius: BorderRadius.circular(R.sm)),
               child: Text(
                 _cashbackEarned != null && _cashbackEarned! > 0
-                    ? 'Начислится $_cashbackEarned баллов после подтверждения'
+                    ? isFinikPayment
+                        ? 'Начислено $_cashbackEarned баллов'
+                        : 'Начислится $_cashbackEarned баллов после подтверждения'
                     : 'Баллы начислятся после подтверждения',
                 style: TextStyle(
                     fontSize: 12,

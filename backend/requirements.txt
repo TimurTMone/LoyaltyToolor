@@ -10,6 +10,8 @@ python-multipart==0.0.19
 pillow==11.1.0
 httpx==0.28.1
 sentry-sdk[fastapi]==2.19.2
+anthropic==0.43.0
+mixpanel==4.10.1
 pytest==8.3.4
 pytest-asyncio==0.24.0
 aiosqlite==0.20.0

@@ -5,12 +5,9 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../models/product.dart';
-import '../models/loyalty.dart';
 import '../services/api_service.dart';
 import 'product_detail_screen.dart';
-
-// TODO: Connect chat to real AI/chat API endpoint (e.g. POST /api/v1/chat)
-// Currently uses local scripted responses with product data fetched from API.
+import '../services/analytics_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -25,6 +22,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _inputCtrl = TextEditingController();
   bool _typing = false;
   bool _started = false;
+  String? _sessionId;
 
   @override
   void dispose() {
@@ -33,20 +31,31 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _startChat() {
+  Future<void> _startChat() async {
     if (_started) return;
     _started = true;
+
+    // Create a chat session on the backend
+    try {
+      final res = await ApiService.dio.post('/api/v1/chat/sessions');
+      _sessionId = res.data['id'];
+    } catch (_) {
+      // If session creation fails, we'll work without persistence
+    }
+
     final auth = context.read<AuthProvider>();
     final name = auth.isLoggedIn ? auth.user!.name.split(' ').first : 'друг';
     final tier = auth.loyalty?.tierName ?? 'Bronze';
     final pts = auth.loyalty?.points ?? 0;
 
-    _addBot('Привет, $name! 👋 Я — стилист TOOLOR. Помогу подобрать образ, расскажу про акции и бонусы.');
+    _addLocalBot('Привет, $name! 👋 Я — AI-стилист TOOLOR. Помогу подобрать образ, расскажу про акции и бонусы.');
 
     Future.delayed(const Duration(milliseconds: 1200), () {
-      _addBot('У тебя $tier статус и $pts баллов. Вот что могу предложить:');
+      if (!mounted) return;
+      _addLocalBot('У тебя $tier статус и $pts баллов. Спрашивай что угодно!');
       Future.delayed(const Duration(milliseconds: 800), () {
-        _addChips(['🔥 Скидки сейчас', '👕 Подобрать образ', '⭐ Мои баллы', '📦 Box подписка']);
+        if (!mounted) return;
+        _addChips(['🔥 Скидки сейчас', '👕 Подобрать образ', '⭐ Мои баллы', '📦 Мои заказы']);
       });
     });
   }
@@ -57,7 +66,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _addBot(String text) {
+  /// Add a local bot message with typing animation (for greeting only).
+  void _addLocalBot(String text) {
     setState(() => _typing = true);
     Future.delayed(Duration(milliseconds: 400 + text.length * 8), () {
       if (!mounted) return;
@@ -95,7 +105,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _trimMessages();
     });
     _scroll();
-    _handleInput(text.trim().toLowerCase());
+    Analytics.chatMessage();
+    _sendToBackend(text.trim());
   }
 
   void _handleChip(String chip) {
@@ -105,118 +116,73 @@ class _ChatScreenState extends State<ChatScreen> {
       _trimMessages();
     });
     _scroll();
-    _handleInput(chip.toLowerCase());
+    _sendToBackend(chip);
   }
 
-  /// Fetch products from API with an optional search query, then filter locally.
-  Future<List<Product>> _fetchChatProducts({String? search, bool Function(Product)? filter}) async {
-    try {
-      final Map<String, dynamic> params = {'per_page': 10};
-      if (search != null) params['search'] = search;
-      final response = await ApiService.dio.get('/api/v1/products', queryParameters: params);
-      var items = (response.data['items'] as List)
-          .map((json) => Product.fromJson(json as Map<String, dynamic>))
-          .where((p) => p.price > 0)
-          .toList();
-      if (filter != null) items = items.where(filter).toList();
-      return items.take(4).toList();
-    } catch (_) {
-      return [];
-    }
-  }
+  /// Send message to backend AI and display the response.
+  Future<void> _sendToBackend(String text) async {
+    setState(() => _typing = true);
 
-  void _handleInput(String input) {
-    if (input.contains('скидк') || input.contains('sale') || input.contains('акци')) {
-      _addBot('Ищу товары со скидками...');
-      _fetchChatProducts(filter: (p) => p.originalPrice != null).then((sale) {
+    // If no session yet, create one
+    if (_sessionId == null) {
+      try {
+        final res = await ApiService.dio.post('/api/v1/chat/sessions');
+        _sessionId = res.data['id'];
+      } catch (_) {
         if (!mounted) return;
-        if (sale.isNotEmpty) {
-          _addBot('Сейчас ${sale.length} товаров со скидкой до 40%! Вот лучшие:');
-          Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(sale));
-        } else {
-          _addBot('К сожалению, не удалось загрузить товары. Попробуйте позже.');
-        }
-      });
-    } else if (input.contains('образ') || input.contains('подобр') || input.contains('стиль') || input.contains('outfit')) {
-      _addBot('Какой стиль тебе ближе?');
-      Future.delayed(const Duration(milliseconds: 700), () {
-        _addChips(['🏙️ Городской', '🏔️ Outdoor', '💼 Деловой', '🎒 Casual']);
-      });
-    } else if (input.contains('городск') || input.contains('urban')) {
-      _addBot('Для города рекомендую — куртка + брюки + свитшот. Ищу варианты...');
-      _fetchChatProducts(filter: (p) {
-        return p.subcategory.contains('Куртк') || p.subcategory.contains('Брюк') || p.subcategory.contains('Свитш');
-      }).then((urban) {
-        if (!mounted) return;
-        if (urban.isNotEmpty) {
-          _addProductCards(urban);
-        }
-      });
-    } else if (input.contains('outdoor') || input.contains('горн')) {
-      _addBot('Для outdoor — пуховик или ветровка + флис. Ищу...');
-      _fetchChatProducts(filter: (p) {
-        return p.subcategory.contains('Пуховик') || p.subcategory.contains('Флис') || p.subcategory.contains('Ветровк');
-      }).then((out) {
-        if (!mounted) return;
-        if (out.isNotEmpty) {
-          _addProductCards(out);
-        }
-      });
-    } else if (input.contains('балл') || input.contains('лояльн') || input.contains('кэшбэк') || input.contains('cashback') || input.contains('point')) {
-      final auth = context.read<AuthProvider>();
-      final l = auth.loyalty;
-      if (l != null) {
-        final left = l.nextTierThreshold - l.totalSpent;
-        _addBot('У тебя ${l.points} баллов (${l.cashbackPercent}% кэшбэк).\n\nДо ${l.tier != LoyaltyTier.platinum ? "следующего уровня осталось ${left.toStringAsFixed(0)} сом" : "максимального уровня — ты уже там! 🎉"}');
-        Future.delayed(const Duration(milliseconds: 800), () {
-          _addBot('Баллы можно списать при следующей покупке на кассе или онлайн.');
-        });
+        setState(() => _typing = false);
+        _addLocalBot('Не удалось подключиться. Попробуйте позже.');
+        return;
       }
-    } else if (input.contains('box') || input.contains('подписк')) {
-      _addBot('TOOLOR Box — ежемесячная подписка. Наши стилисты подберут 3–5 вещей по твоему стилю.\n\n• Basic — 4 990 сом (3 вещи)\n• Premium — 8 990 сом (5 вещей)\n\nСкоро запуск! Хочешь, запишу тебя?');
-      Future.delayed(const Duration(milliseconds: 800), () {
-        _addChips(['✅ Да, запиши!', '🤔 Расскажи подробнее']);
-      });
-    } else if (input.contains('да') || input.contains('запиш')) {
-      _addBot('Записала! Мы напишем тебе, как только Box будет доступен. 📬');
-    } else if (input.contains('размер') || input.contains('size')) {
-      _addBot('Подскажу размер! Какой у тебя рост и вес? Например: "175 см, 70 кг"');
-    } else if (RegExp(r'\d{2,3}\s*(см)?,?\s*\d{2,3}\s*(кг)?').hasMatch(input)) {
-      _addBot('Для роста ~175 и веса ~70 рекомендую размер M в верхней одежде и M-L в брюках.\n\nНо лучше всего — примерка в нашем бутике! AsiaMall, 2 этаж, бутик 19(1) 📍');
-    } else if (input.contains('деловой') || input.contains('бизнес') || input.contains('💼')) {
-      _addBot('Деловой стиль — рубашка + брюки. Ищу подборку...');
-      _fetchChatProducts(filter: (p) {
-        return p.subcategory.contains('Рубашк') || p.subcategory.contains('Брюк');
-      }).then((biz) {
-        if (!mounted) return;
-        if (biz.isNotEmpty) {
-          _addProductCards(biz);
+    }
+
+    try {
+      final res = await ApiService.dio.post(
+        '/api/v1/chat/sessions/$_sessionId/messages',
+        data: {'content': text},
+      );
+
+      if (!mounted) return;
+      setState(() => _typing = false);
+
+      // Response is a list: [user_msg, assistant_msg]
+      final messages = res.data as List;
+      if (messages.length >= 2) {
+        final assistantMsg = messages[1];
+        final replyText = assistantMsg['content'] as String;
+        final products = assistantMsg['products'] as List? ?? [];
+
+        // Add the bot reply
+        setState(() {
+          _messages.add(_Msg(text: replyText, isUser: false));
+          _trimMessages();
+        });
+        _scroll();
+
+        // If the AI recommended products, show them as cards
+        if (products.isNotEmpty) {
+          final productCards = products.map((p) {
+            final map = p as Map<String, dynamic>;
+            return Product.fromJson(map);
+          }).toList();
+
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (!mounted) return;
+            _addProductCards(productCards);
+          });
         }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _typing = false);
+      setState(() {
+        _messages.add(_Msg(
+          text: 'Упс, не удалось получить ответ. Попробуйте ещё раз! 🔄',
+          isUser: false,
+        ));
+        _trimMessages();
       });
-    } else if (input.contains('casual') || input.contains('🎒')) {
-      _addBot('Casual vibes — худи + футболка + шорты:');
-      _fetchChatProducts(filter: (p) {
-        return p.subcategory.contains('Худи') || p.subcategory.contains('Футболк') || p.subcategory.contains('Шорты');
-      }).then((cas) {
-        if (!mounted) return;
-        if (cas.isNotEmpty) {
-          Future.delayed(const Duration(milliseconds: 900), () => _addProductCards(cas));
-        }
-      });
-    } else if (input.contains('привет') || input.contains('здравствуй') || input.contains('hello') || input.contains('hi')) {
-      _addBot('Привет! Чем могу помочь? 😊');
-      Future.delayed(const Duration(milliseconds: 700), () {
-        _addChips(['🔥 Скидки сейчас', '👕 Подобрать образ', '⭐ Мои баллы']);
-      });
-    } else if (input.contains('спасиб') || input.contains('thank')) {
-      _addBot('Всегда рада помочь! Если что — пиши. 💚');
-    } else if (input.contains('подробн') || input.contains('расскаж')) {
-      _addBot('Каждый месяц мы собираем персональный набор вещей на основе твоих предпочтений.\n\nТы получаешь коробку, примеряешь дома и оставляешь только то, что нравится. Остальное возвращаешь бесплатно!');
-    } else {
-      _addBot('Хороший вопрос! Могу помочь с подбором одежды, акциями, баллами или размерами. Что интересует?');
-      Future.delayed(const Duration(milliseconds: 700), () {
-        _addChips(['🔥 Скидки', '👕 Стиль', '⭐ Баллы', '📏 Размер']);
-      });
+      _scroll();
     }
   }
 
@@ -264,7 +230,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     Container(width: 6, height: 6, decoration: BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
                     const SizedBox(width: 4),
-                    Text('печатает...', style: TextStyle(fontSize: 11, color: AppColors.accent)),
+                    Text('думает...', style: TextStyle(fontSize: 11, color: AppColors.accent)),
                   ]),
               ],
             ),
@@ -293,7 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     controller: _inputCtrl,
                     style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
                     decoration: const InputDecoration(
-                      hintText: 'Напишите сообщение...',
+                      hintText: 'Спросите что угодно...',
                       contentPadding: EdgeInsets.symmetric(horizontal: S.x12, vertical: S.x8),
                     ),
                     onSubmitted: _sendMessage,
@@ -381,7 +347,7 @@ class _ChatScreenState extends State<ChatScreen> {
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           itemCount: products.length,
-          separatorBuilder: (_, _) => const SizedBox(width: S.x8),
+          separatorBuilder: (_, __) => const SizedBox(width: S.x8),
           itemBuilder: (_, i) {
             final p = products[i];
             return GestureDetector(
@@ -401,7 +367,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         fit: StackFit.expand,
                         children: [
                           Image.network(p.displayImageUrl, fit: BoxFit.cover, width: double.infinity,
-                            errorBuilder: (_, _, _) => Container(color: AppColors.surfaceOverlay)),
+                            errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceOverlay)),
                           if (p.isOnSale) Positioned(
                             top: 6, left: 6,
                             child: Container(

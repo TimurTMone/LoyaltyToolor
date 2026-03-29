@@ -3,12 +3,14 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.dependencies import get_current_user, get_db
 from app.models.chat import ChatMessage, ChatSession
 from app.models.user import Profile
 from app.schemas.chat import ChatMessageCreate, ChatMessageOut, ChatSessionOut
+from app.services.ai_service import generate_ai_reply
+from app.services.analytics_service import track_chat_message
 
 router = APIRouter()
 
@@ -70,8 +72,17 @@ async def send_message(
     )
     db.add(user_msg)
 
-    # Generate rule-based response (MVP — replace with LLM later)
-    reply_text, products = _generate_reply(body.content)
+    # Generate AI response via Claude API (falls back to simple reply if key not set)
+    if settings.ANTHROPIC_API_KEY:
+        reply_text, products = await generate_ai_reply(
+            db=db,
+            user_id=user.id,
+            session_id=session.id,
+            user_message=body.content,
+        )
+    else:
+        reply_text, products = _generate_fallback_reply(body.content)
+
     assistant_msg = ChatMessage(
         session_id=session.id,
         role="assistant",
@@ -83,6 +94,9 @@ async def send_message(
     await db.commit()
     await db.refresh(user_msg)
     await db.refresh(assistant_msg)
+
+    track_chat_message(str(user.id), str(session.id), is_ai=False)
+    track_chat_message(str(user.id), str(session.id), is_ai=True)
 
     return [
         ChatMessageOut.model_validate(user_msg),
@@ -100,43 +114,24 @@ async def _get_user_session(db: AsyncSession, session_id: uuid.UUID, user_id: uu
     return session
 
 
-def _generate_reply(content: str) -> tuple[str, list]:
-    """Rule-based chatbot (MVP). Replace with Claude API integration later."""
+def _generate_fallback_reply(content: str) -> tuple[str, list]:
+    """Simple fallback when ANTHROPIC_API_KEY is not configured."""
     text = content.lower()
     if any(w in text for w in ["скидк", "sale", "акци"]):
         return (
-            "У нас сейчас есть отличные скидки в разделе 'Скидки'! "
-            "Загляните в каталог — там можно найти куртки, худи и другие вещи со скидкой до 50%.",
+            "У нас сейчас есть отличные скидки! Загляните в каталог — скидки до 50%. 🔥",
             [],
         )
     if any(w in text for w in ["балл", "бонус", "кэшбэк", "лояльност"]):
         return (
             "Система лояльности TOOLOR:\n"
-            "• Бронза — кэшбэк 3%\n"
-            "• Серебро (от 50 000 сом) — кэшбэк 5%\n"
-            "• Золото (от 150 000 сом) — кэшбэк 8%\n"
-            "• Платина (от 300 000 сом) — кэшбэк 12%\n\n"
-            "Баллы можно использовать при следующей покупке!",
+            "• Бронза — 3% кэшбэк\n• Серебро (от 50К) — 5%\n"
+            "• Золото (от 150К) — 8%\n• Платина (от 300К) — 12%",
             [],
         )
-    if any(w in text for w in ["размер", "size", "подобрать"]):
-        return (
-            "Для подбора размера рекомендую свериться с размерной сеткой на странице товара. "
-            "Если сомневаетесь — выберите услугу 'Примерка дома' при оформлении заказа!",
-            [],
-        )
-    if any(w in text for w in ["образ", "стиль", "look", "outfit"]):
-        return (
-            "Могу помочь собрать образ! Расскажите, для какого случая ищете одежду — "
-            "повседневный стиль, офис или спорт?",
-            [],
-        )
+    if any(w in text for w in ["размер", "size"]):
+        return ("Для подбора размера назовите рост и вес — я подскажу! 📏", [])
     return (
-        "Привет! Я стилист TOOLOR. Могу помочь с:\n"
-        "• Подбором размера\n"
-        "• Составлением образа\n"
-        "• Информацией о скидках\n"
-        "• Программой лояльности\n\n"
-        "Что вас интересует?",
+        "Привет! Я стилист TOOLOR. Помогу с подбором одежды, размерами, акциями и бонусами. Что интересует? 😊",
         [],
     )

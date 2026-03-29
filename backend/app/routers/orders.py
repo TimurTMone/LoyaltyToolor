@@ -14,6 +14,7 @@ from app.models.user import Profile
 from app.schemas.order import OrderCreate, OrderOut, OrderTrackOut, TimelineEntry
 from app.services.order_service import create_order_from_cart
 from app.services.upload_service import save_upload
+from app.services.analytics_service import track_purchase
 
 router = APIRouter()
 
@@ -38,6 +39,14 @@ async def create_order(
             pickup_location_id=body.pickup_location_id,
         )
         await db.commit()
+        track_purchase(
+            user_id=str(user.id),
+            order_id=str(order.id),
+            total=float(order.total),
+            items_count=len(order.items),
+            payment_method=body.payment_method or "unknown",
+            points_used=body.points_used or 0,
+        )
         return OrderOut.model_validate(order)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

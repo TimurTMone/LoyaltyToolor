@@ -15,13 +15,16 @@ import 'screens/profile_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'services/api_service.dart';
+import 'services/analytics_service.dart';
 
 const _sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+const _mixpanelToken = String.fromEnvironment('MIXPANEL_TOKEN', defaultValue: '');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await ApiService.init();
+  await Analytics.init(_mixpanelToken);
 
   // Warm up serverless backend (prevents cold start 502 on first real request)
   ApiService.dio.get('/api/v1/health').ignore();
