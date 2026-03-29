@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 const _envUrl = String.fromEnvironment('API_URL', defaultValue: '');
 final String apiBaseUrl = _envUrl.isNotEmpty
     ? _envUrl
-    : 'https://backend-jet-one-87.vercel.app';
+    : 'https://loyaltytoolor.onrender.com';
 
 /// Dio-based HTTP client singleton.
 /// Call [init] once in main() before runApp().
