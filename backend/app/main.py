@@ -136,6 +136,22 @@ async def health():
     return {"status": "ok"}
 
 
+@app.post("/api/v1/admin/restore-admin")
+async def restore_admin():
+    """Emergency: restore admin for the super admin phone. Remove after use."""
+    from app.database import async_session
+    from app.models.user import Profile
+    from sqlalchemy import select, update
+    async with async_session() as db:
+        await db.execute(
+            update(Profile)
+            .where(Profile.phone == settings.ADMIN_PHONE)
+            .values(is_admin=True)
+        )
+        await db.commit()
+    return {"restored": settings.ADMIN_PHONE}
+
+
 @app.post("/api/v1/admin/migrate-from-neon")
 async def migrate_from_neon():
     """One-time migration: copy data from Neon to current DB. Remove after use."""
