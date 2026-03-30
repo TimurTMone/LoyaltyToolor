@@ -24,6 +24,13 @@ class CategoryOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class StoreAvailabilityOut(BaseModel):
+    location_id: uuid.UUID
+    location_name: str
+    sizes_in_stock: list[str] = []
+    total_quantity: int = 0
+
+
 class ProductOut(BaseModel):
     id: uuid.UUID
     sku: str | None = None
@@ -45,6 +52,7 @@ class ProductOut(BaseModel):
     is_featured: bool
     sort_order: int
     created_at: datetime
+    store_availability: list[StoreAvailabilityOut] | None = None
 
     model_config = {"from_attributes": True}
 
@@ -97,3 +105,35 @@ class SubcategoryCreate(BaseModel):
     name: str
     slug: str
     sort_order: int = 0
+
+
+# ── Store Inventory Schemas ──────────────────────────────────────────────
+
+class StoreInventoryOut(BaseModel):
+    id: uuid.UUID
+    location_id: uuid.UUID
+    product_id: uuid.UUID
+    size: str | None = None
+    quantity: int
+
+    model_config = {"from_attributes": True}
+
+
+class StoreInventoryUpdate(BaseModel):
+    quantity: int
+
+
+class BulkInventoryItem(BaseModel):
+    location_id: uuid.UUID
+    product_id: uuid.UUID
+    size: str | None = None
+    quantity: int
+
+
+class BulkInventoryUpdate(BaseModel):
+    items: list[BulkInventoryItem]
+
+
+class AssignProductRequest(BaseModel):
+    location_id: uuid.UUID
+    product_id: uuid.UUID

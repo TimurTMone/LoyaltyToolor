@@ -1,5 +1,6 @@
 import uuid
 import math
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
@@ -7,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import get_db
-from app.models.product import Category, Product, Subcategory
-from app.schemas.product import CategoryOut, ProductOut
+from app.models.product import Category, Product, StoreInventory, Subcategory
+from app.schemas.product import CategoryOut, ProductOut, StoreAvailabilityOut
 
 router = APIRouter()
 
 
-def _product_to_out(p: Product) -> ProductOut:
+def _product_to_out(p: Product, availability: list[StoreAvailabilityOut] | None = None) -> ProductOut:
     return ProductOut(
         id=p.id,
         sku=p.sku,
@@ -35,7 +36,51 @@ def _product_to_out(p: Product) -> ProductOut:
         is_featured=p.is_featured,
         sort_order=p.sort_order,
         created_at=p.created_at,
+        store_availability=availability,
     )
+
+
+async def _build_availability(
+    db: AsyncSession,
+    product_ids: list[uuid.UUID],
+    location_id: uuid.UUID | None = None,
+) -> dict[uuid.UUID, list[StoreAvailabilityOut]]:
+    """Build per-store availability for a list of products."""
+    query = (
+        select(StoreInventory)
+        .options(selectinload(StoreInventory.location))
+        .where(StoreInventory.product_id.in_(product_ids))
+    )
+    if location_id:
+        query = query.where(StoreInventory.location_id == location_id)
+
+    result = await db.execute(query)
+    rows = result.scalars().all()
+
+    # Group by (product_id, location_id)
+    grouped: dict[uuid.UUID, dict[uuid.UUID, list]] = defaultdict(lambda: defaultdict(list))
+    loc_names: dict[uuid.UUID, str] = {}
+
+    for row in rows:
+        grouped[row.product_id][row.location_id].append(row)
+        if row.location:
+            loc_names[row.location_id] = row.location.name
+
+    avail_map: dict[uuid.UUID, list[StoreAvailabilityOut]] = {}
+    for pid, stores in grouped.items():
+        avail_list = []
+        for lid, inv_rows in stores.items():
+            sizes_in_stock = [r.size for r in inv_rows if r.quantity > 0 and r.size is not None]
+            total_qty = sum(r.quantity for r in inv_rows)
+            avail_list.append(StoreAvailabilityOut(
+                location_id=lid,
+                location_name=loc_names.get(lid, ""),
+                sizes_in_stock=sizes_in_stock,
+                total_quantity=total_qty,
+            ))
+        avail_map[pid] = avail_list
+
+    return avail_map
 
 
 @router.get("", response_model=dict)
@@ -47,6 +92,7 @@ async def list_products(
     is_featured: bool | None = None,
     min_price: float | None = None,
     max_price: float | None = None,
+    location_id: uuid.UUID | None = None,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -77,6 +123,18 @@ async def list_products(
     if max_price is not None:
         query = query.where(Product.price <= max_price)
 
+    # Filter to products available at a specific store
+    if location_id:
+        available_product_ids = (
+            select(StoreInventory.product_id)
+            .where(
+                StoreInventory.location_id == location_id,
+                StoreInventory.quantity > 0,
+            )
+            .distinct()
+        )
+        query = query.where(Product.id.in_(available_product_ids))
+
     # Count
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
@@ -87,8 +145,18 @@ async def list_products(
     result = await db.execute(query)
     products = result.scalars().all()
 
+    # Build availability data when location_id is provided
+    avail_map = {}
+    if location_id and products:
+        avail_map = await _build_availability(db, [p.id for p in products], location_id)
+
+    items = []
+    for p in products:
+        avail = avail_map.get(p.id) if location_id else None
+        items.append(_product_to_out(p, availability=avail))
+
     return {
-        "items": [_product_to_out(p) for p in products],
+        "items": items,
         "total": total,
         "page": page,
         "per_page": per_page,
@@ -107,7 +175,11 @@ async def list_categories(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{product_id}", response_model=ProductOut)
-async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_product(
+    product_id: uuid.UUID,
+    location_id: uuid.UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(
         select(Product)
         .options(selectinload(Product.category), selectinload(Product.subcategory))
@@ -116,4 +188,21 @@ async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return _product_to_out(product)
+
+    avail = None
+    if location_id:
+        avail_map = await _build_availability(db, [product.id], location_id)
+        avail = avail_map.get(product.id)
+
+    return _product_to_out(product, availability=avail)
+
+
+@router.get("/{product_id}/availability")
+async def get_product_availability(
+    product_id: uuid.UUID,
+    location_id: uuid.UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-store availability for a product. Optionally filter to one store."""
+    avail_map = await _build_availability(db, [product_id], location_id)
+    return avail_map.get(product_id, [])

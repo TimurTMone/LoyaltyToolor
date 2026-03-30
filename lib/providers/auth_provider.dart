@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/loyalty.dart';
@@ -224,11 +225,18 @@ class AuthProvider extends ChangeNotifier {
         _isLoggedIn = true;
         startQrRefresh();
       }
+    } on DioException catch (e) {
+      debugPrint('[AuthProvider] tryRestoreSession error: $e');
+      // Only clear tokens on definitive auth failure (401 after refresh failed).
+      // Network errors / timeouts / cold-start 502s should NOT destroy the session.
+      final code = e.response?.statusCode;
+      if (code == 401 || code == 403) {
+        await ApiService.logout();
+        _isLoggedIn = false;
+      }
+      // For network errors, leave tokens intact — user can retry later.
     } catch (e) {
       debugPrint('[AuthProvider] tryRestoreSession error: $e');
-      // Token may be expired / invalid — clear and stay logged out
-      await ApiService.logout();
-      _isLoggedIn = false;
     } finally {
       _isLoading = false;
       notifyListeners();

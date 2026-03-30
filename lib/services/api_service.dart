@@ -98,17 +98,36 @@ class ApiService {
   }
 
   /// Attempt to exchange the refresh token for a new access token.
+  /// Retries once on 502 (Render cold-start).
   static Future<bool> _tryRefreshToken() async {
     final refresh = await _storage.read(key: _refreshTokenKey);
     if (refresh == null) return false;
 
     try {
-      // Use a plain Dio instance to avoid interceptor recursion.
-      final plainDio = Dio(BaseOptions(baseUrl: apiBaseUrl));
-      final response = await plainDio.post(
-        '/api/v1/auth/refresh',
-        data: {'refresh_token': refresh},
-      );
+      final plainDio = Dio(BaseOptions(
+        baseUrl: apiBaseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      ));
+
+      Response response;
+      try {
+        response = await plainDio.post(
+          '/api/v1/auth/refresh',
+          data: {'refresh_token': refresh},
+        );
+      } on DioException catch (e) {
+        // Retry once on 502 (cold-start)
+        if (e.response?.statusCode == 502) {
+          await Future.delayed(const Duration(seconds: 2));
+          response = await plainDio.post(
+            '/api/v1/auth/refresh',
+            data: {'refresh_token': refresh},
+          );
+        } else {
+          rethrow;
+        }
+      }
 
       final data = response.data as Map<String, dynamic>;
       final newAccess = data['access_token'] as String?;

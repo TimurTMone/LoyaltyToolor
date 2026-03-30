@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -68,3 +68,21 @@ class Product(Base):
 
     category: Mapped["Category"] = relationship()
     subcategory: Mapped["Subcategory"] = relationship()
+    inventory: Mapped[list["StoreInventory"]] = relationship(back_populates="product")
+
+
+class StoreInventory(Base):
+    __tablename__ = "store_inventory"
+    __table_args__ = (
+        UniqueConstraint("location_id", "product_id", "size", name="uq_store_inventory_loc_prod_size"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    location_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("locations.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    size: Mapped[str | None] = mapped_column(String, nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    product: Mapped["Product"] = relationship(back_populates="inventory")
+    location: Mapped["Location"] = relationship()  # type: ignore[name-defined]  # noqa: F821

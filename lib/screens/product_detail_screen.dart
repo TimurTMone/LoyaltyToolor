@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
+import '../providers/store_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/locations_sheet.dart';
 import '../services/analytics_service.dart';
@@ -34,9 +35,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _size = widget.product.sizes.isNotEmpty ? widget.product.sizes[0] : '';
-    _color = widget.product.colors.isNotEmpty ? widget.product.colors[0] : '';
-    Analytics.productView(widget.product.id, widget.product.name, widget.product.price);
+    final p = widget.product;
+    final storeId = context.read<StoreProvider>().selectedStoreId;
+    // Auto-select first available size at the selected store
+    if (p.sizes.isNotEmpty && storeId != null && p.storeAvailability != null) {
+      final available = p.availableSizesAt(storeId);
+      _size = available.isNotEmpty ? available.first : p.sizes.first;
+    } else {
+      _size = p.sizes.isNotEmpty ? p.sizes.first : '';
+    }
+    _color = p.colors.isNotEmpty ? p.colors.first : '';
+    Analytics.productView(p.id, p.name, p.price);
   }
 
   @override
@@ -129,15 +138,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               style: TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w500),
                             ),
                           ),
-                          if (p.stock != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: S.x8, vertical: S.x4),
-                              decoration: BoxDecoration(color: AppColors.goldSoft, borderRadius: BorderRadius.circular(R.xs)),
-                              child: Text(
-                                'Осталось ${p.stock} шт',
-                                style: TextStyle(fontSize: 11, color: AppColors.gold, fontWeight: FontWeight.w600),
-                              ),
-                            ),
+                          Builder(builder: (_) {
+                            final storeId = context.read<StoreProvider>().selectedStoreId;
+                            final storeName = context.read<StoreProvider>().selectedStoreName;
+                            final storeQty = storeId != null ? p.stockAtStore(storeId) : null;
+                            // Show per-store stock if available, otherwise fall back to global
+                            final qty = storeQty ?? p.stock;
+                            if (qty != null && qty > 0) {
+                              final label = storeName != null
+                                  ? 'Осталось $qty шт в $storeName'
+                                  : 'Осталось $qty шт';
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: S.x8, vertical: S.x4),
+                                decoration: BoxDecoration(color: AppColors.goldSoft, borderRadius: BorderRadius.circular(R.xs)),
+                                child: Text(label, style: TextStyle(fontSize: 11, color: AppColors.gold, fontWeight: FontWeight.w600)),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          }),
                         ],
                       ),
 
@@ -147,11 +165,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       if (p.sizes.isNotEmpty) ...[
                         _label('РАЗМЕР'),
                         const SizedBox(height: S.x8),
-                        Wrap(
-                          spacing: S.x8,
-                          runSpacing: S.x8,
-                          children: p.sizes.map((s) => _chip(s, s == _size, () { HapticFeedback.selectionClick(); setState(() => _size = s); })).toList(),
-                        ),
+                        Builder(builder: (_) {
+                          final storeId = context.read<StoreProvider>().selectedStoreId;
+                          final hasAvailData = storeId != null && p.storeAvailability != null;
+                          return Wrap(
+                            spacing: S.x8,
+                            runSpacing: S.x8,
+                            children: p.sizes.map((s) {
+                              final available = !hasAvailData || p.isSizeAvailableAt(s, storeId!);
+                              return _sizeChip(s, s == _size, available, () {
+                                if (!available) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Размер $s недоступен в этом магазине'), duration: const Duration(seconds: 2)),
+                                  );
+                                  return;
+                                }
+                                HapticFeedback.selectionClick();
+                                setState(() => _size = s);
+                              });
+                            }).toList(),
+                          );
+                        }),
                         const SizedBox(height: S.x20),
                       ],
 
@@ -251,16 +285,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 color: AppColors.surface,
                 border: Border(top: BorderSide(color: AppColors.divider)),
               ),
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _added ? null : () => _addToCart(p),
-                  style: _added
-                      ? ElevatedButton.styleFrom(backgroundColor: AppColors.accentSoft, foregroundColor: AppColors.accent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.pill)))
-                      : null,
-                  child: Text(_added ? 'ДОБАВЛЕНО  \u2713' : _tryHome ? 'ПРИМЕРКА ДОМА  \u2014  ${p.formattedPrice}' : 'В КОРЗИНУ  \u2014  ${p.formattedPrice}'),
-                ),
-              ),
+              child: Builder(builder: (_) {
+                final storeId = context.read<StoreProvider>().selectedStoreId;
+                final hasAvailData = storeId != null && p.storeAvailability != null;
+                final sizeAvailable = !hasAvailData || _size.isEmpty || p.isSizeAvailableAt(_size, storeId!);
+                final canAdd = !_added && sizeAvailable;
+                return SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: canAdd ? () => _addToCart(p) : null,
+                    style: _added
+                        ? ElevatedButton.styleFrom(backgroundColor: AppColors.accentSoft, foregroundColor: AppColors.accent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.pill)))
+                        : !sizeAvailable
+                            ? ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceElevated, foregroundColor: AppColors.textTertiary)
+                            : null,
+                    child: Text(
+                      _added
+                          ? 'ДОБАВЛЕНО  \u2713'
+                          : !sizeAvailable
+                              ? 'НЕТ В НАЛИЧИИ'
+                              : _tryHome
+                                  ? 'ПРИМЕРКА ДОМА  \u2014  ${p.formattedPrice}'
+                                  : 'В КОРЗИНУ  \u2014  ${p.formattedPrice}',
+                    ),
+                  ),
+                );
+              }),
             ),
           ),
         ],
@@ -313,6 +363,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             fontSize: 13,
             color: selected ? AppColors.textInverse : AppColors.textSecondary,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sizeChip(String text, bool selected, bool available, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: S.x16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected && available
+              ? AppColors.textPrimary
+              : !available
+                  ? AppColors.surfaceElevated
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(R.sm),
+          border: Border.all(
+            color: !available
+                ? AppColors.divider
+                : selected
+                    ? AppColors.textPrimary
+                    : AppColors.surfaceBright,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            color: !available
+                ? AppColors.textTertiary.withValues(alpha: 0.5)
+                : selected
+                    ? AppColors.textInverse
+                    : AppColors.textSecondary,
+            fontWeight: selected && available ? FontWeight.w600 : FontWeight.w400,
+            decoration: !available ? TextDecoration.lineThrough : null,
           ),
         ),
       ),

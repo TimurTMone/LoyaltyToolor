@@ -1,5 +1,29 @@
 import '../services/api_service.dart' show apiBaseUrl;
 
+/// Per-store availability data returned by the API.
+class StoreAvailability {
+  final String locationId;
+  final String locationName;
+  final List<String> sizesInStock;
+  final int totalQuantity;
+
+  StoreAvailability({
+    required this.locationId,
+    required this.locationName,
+    required this.sizesInStock,
+    required this.totalQuantity,
+  });
+
+  factory StoreAvailability.fromJson(Map<String, dynamic> json) {
+    return StoreAvailability(
+      locationId: json['location_id']?.toString() ?? '',
+      locationName: json['location_name'] as String? ?? '',
+      sizesInStock: (json['sizes_in_stock'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      totalQuantity: json['total_quantity'] as int? ?? 0,
+    );
+  }
+}
+
 class Product {
   final String id;
   final String name;
@@ -12,6 +36,7 @@ class Product {
   final List<String> sizes;
   final List<String> colors;
   final int? stock; // null = no scarcity shown
+  final List<StoreAvailability>? storeAvailability;
 
   Product({
     required this.id,
@@ -25,6 +50,7 @@ class Product {
     required this.sizes,
     required this.colors,
     this.stock,
+    this.storeAvailability,
   });
 
   factory Product.fromMap(Map<String, dynamic> map) {
@@ -68,6 +94,7 @@ class Product {
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final availRaw = json['store_availability'] as List?;
     return Product(
       id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? 'Без названия',
@@ -82,6 +109,7 @@ class Product {
       sizes: (json['sizes'] as List?)?.map((e) => e.toString()).toList() ?? [],
       colors: (json['colors'] as List?)?.map((e) => e.toString()).toList() ?? [],
       stock: json['stock'] != null ? int.tryParse(json['stock'].toString()) : null,
+      storeAvailability: availRaw?.map((e) => StoreAvailability.fromJson(e as Map<String, dynamic>)).toList(),
     );
   }
 
@@ -126,5 +154,36 @@ class Product {
       buf.write(s[i]);
     }
     return buf.toString();
+  }
+
+  // ── Store availability helpers ──────────────────────────────────────
+
+  /// Check if a specific size is available at a given store.
+  bool isSizeAvailableAt(String size, String locationId) {
+    final avail = availabilityAt(locationId);
+    if (avail == null) return true; // no data = assume available
+    return avail.sizesInStock.contains(size);
+  }
+
+  /// Total stock at a specific store.
+  int stockAtStore(String locationId) {
+    final avail = availabilityAt(locationId);
+    return avail?.totalQuantity ?? 0;
+  }
+
+  /// Get availability object for a specific store.
+  StoreAvailability? availabilityAt(String locationId) {
+    if (storeAvailability == null) return null;
+    for (final a in storeAvailability!) {
+      if (a.locationId == locationId) return a;
+    }
+    return null;
+  }
+
+  /// Sizes available at a specific store. Falls back to all sizes if no data.
+  List<String> availableSizesAt(String locationId) {
+    final avail = availabilityAt(locationId);
+    if (avail == null) return sizes;
+    return avail.sizesInStock;
   }
 }

@@ -28,6 +28,7 @@ from app.routers.admin import (
     locations as admin_locations,
     dashboard as admin_dashboard,
     notifications as admin_notifications,
+    inventory as admin_inventory,
 )
 
 IS_VERCEL = bool(os.environ.get("VERCEL"))
@@ -129,6 +130,7 @@ app.include_router(admin_categories.router, prefix="/api/v1/admin/categories", t
 app.include_router(admin_promo_codes.router, prefix="/api/v1/admin/promo-codes", tags=["admin-promo-codes"])
 app.include_router(admin_locations.router, prefix="/api/v1/admin/locations", tags=["admin-locations"])
 app.include_router(admin_notifications.router, prefix="/api/v1/admin/notifications", tags=["admin-notifications"])
+app.include_router(admin_inventory.router, prefix="/api/v1/admin/inventory", tags=["admin-inventory"])
 
 
 @app.get("/api/v1/health")

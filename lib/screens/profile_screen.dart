@@ -290,14 +290,13 @@ class ProfileScreen extends StatelessWidget {
         '/api/v1/users/me/birthday',
         data: {'birth_date': dateStr},
       );
-      // Refresh profile to get the updated birthDate
+      // Refresh profile and loyalty to get updated birthDate + points
       await auth.fetchProfile();
+      await auth.fetchLoyalty();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Дата рождения сохранена! +1000 баллов')),
         );
-        // Also refresh loyalty to see updated points
-        auth.fetchLoyalty();
       }
     } catch (e) {
       if (context.mounted) {

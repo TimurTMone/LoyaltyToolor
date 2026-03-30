@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/store_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/locations_sheet.dart';
@@ -65,6 +66,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _fetchLocations();
   }
 
+  void _preselectStore() {
+    final storeProv = context.read<StoreProvider>();
+    if (storeProv.selectedStoreId != null && _locations.isNotEmpty) {
+      final match = _locations.where((l) => l.id == storeProv.selectedStoreId);
+      if (match.isNotEmpty && _selectedPickupLocation == null) {
+        setState(() => _selectedPickupLocation = match.first);
+      }
+    }
+  }
+
   @override
   void dispose() {
     _addressCtrl.dispose();
@@ -94,6 +105,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             .toList();
         _isLoadingLocations = false;
       });
+      _preselectStore();
     } catch (_) {
       if (!mounted) return;
       setState(() {

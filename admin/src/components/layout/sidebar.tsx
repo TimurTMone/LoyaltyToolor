@@ -12,6 +12,7 @@ import {
   MapPin,
   ScanLine,
   Bell,
+  Warehouse,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const iconMap: Record<string, LucideIcon> = {
   Ticket,
   MapPin,
   Bell,
+  Warehouse,
 };
 
 export function Sidebar() {

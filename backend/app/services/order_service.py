@@ -7,8 +7,10 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 
 from app.models.cart import CartItem
+from app.models.location import Location
 from app.models.loyalty import LoyaltyAccount
 from app.models.order import Order, OrderItem
+from app.models.product import StoreInventory
 from app.models.promo_code import PromoCode
 from app.services.loyalty_service import award_purchase_points, redeem_points
 
@@ -18,6 +20,25 @@ async def generate_order_number(db: AsyncSession) -> str:
     seq = result.scalar()
     year = datetime.now(timezone.utc).strftime("%Y")
     return f"TOOLOR-{year}-{seq:05d}"
+
+
+async def _resolve_source_location(
+    db: AsyncSession,
+    delivery_type: str,
+    pickup_location_id=None,
+):
+    """Determine which store to decrement stock from."""
+    if delivery_type == "pickup" and pickup_location_id:
+        return pickup_location_id
+
+    # For delivery orders, use the first active store as fulfillment center
+    result = await db.execute(
+        select(Location.id)
+        .where(Location.type == "store", Location.is_active == True)
+        .order_by(Location.sort_order)
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 async def create_order_from_cart(
@@ -42,12 +63,32 @@ async def create_order_from_cart(
     if not cart_items:
         raise ValueError("Cart is empty")
 
-    # Check stock availability before proceeding
+    # Determine which store fulfills this order
+    source_location_id = await _resolve_source_location(db, delivery_type, pickup_location_id)
+
+    # Check per-store stock availability
     for ci in cart_items:
-        if ci.product.stock is not None and ci.product.stock < ci.quantity:
-            raise ValueError(
-                f"Товар '{ci.product.name}' нет в наличии (осталось {ci.product.stock})"
+        if source_location_id:
+            inv_result = await db.execute(
+                select(StoreInventory).where(
+                    StoreInventory.location_id == source_location_id,
+                    StoreInventory.product_id == ci.product_id,
+                    StoreInventory.size == ci.selected_size,
+                )
             )
+            inv = inv_result.scalar_one_or_none()
+            if inv is not None and inv.quantity < ci.quantity:
+                size_label = f" размер {ci.selected_size}" if ci.selected_size else ""
+                raise ValueError(
+                    f"Товар '{ci.product.name}'{size_label} нет в наличии "
+                    f"в выбранном магазине (осталось {inv.quantity})"
+                )
+        else:
+            # Fallback to global stock if no store resolved
+            if ci.product.stock is not None and ci.product.stock < ci.quantity:
+                raise ValueError(
+                    f"Товар '{ci.product.name}' нет в наличии (осталось {ci.product.stock})"
+                )
 
     # Calculate subtotal
     subtotal = Decimal(0)
@@ -129,10 +170,25 @@ async def create_order_from_cart(
         item.order_id = order.id
         db.add(item)
 
-    # Decrement stock for each item
+    # Decrement per-store inventory (with row lock for concurrency)
     for ci in cart_items:
-        if ci.product.stock is not None:
-            ci.product.stock -= ci.quantity
+        if source_location_id:
+            inv_result = await db.execute(
+                select(StoreInventory)
+                .where(
+                    StoreInventory.location_id == source_location_id,
+                    StoreInventory.product_id == ci.product_id,
+                    StoreInventory.size == ci.selected_size,
+                )
+                .with_for_update()
+            )
+            inv = inv_result.scalar_one_or_none()
+            if inv:
+                inv.quantity = max(inv.quantity - ci.quantity, 0)
+        else:
+            # Fallback: decrement global stock
+            if ci.product.stock is not None:
+                ci.product.stock -= ci.quantity
 
     # Award loyalty points
     if loyalty:

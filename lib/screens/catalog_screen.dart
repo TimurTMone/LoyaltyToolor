@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../data/toolor_products.dart';
 import '../models/product.dart';
+import '../providers/store_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/product_card.dart';
 import 'product_detail_screen.dart';
@@ -91,6 +93,12 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
         'page': _currentPage,
       };
 
+      // Pass selected store location_id
+      final storeId = context.read<StoreProvider>().selectedStoreId;
+      if (storeId != null) {
+        params['location_id'] = storeId;
+      }
+
       if (_query.isNotEmpty) {
         params['search'] = _query;
       }
@@ -151,6 +159,45 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
     await _fetchProducts();
   }
 
+  void _showStorePicker(BuildContext context, StoreProvider storeProv) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(S.x16),
+                child: Text('Выберите магазин', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+              ),
+              ...storeProv.stores.map((store) {
+                final selected = store.id == storeProv.selectedStoreId;
+                return ListTile(
+                  leading: Icon(
+                    selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                    color: selected ? AppColors.accent : AppColors.textTertiary,
+                    size: 20,
+                  ),
+                  title: Text(store.name, style: TextStyle(fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: AppColors.textPrimary)),
+                  subtitle: store.hours != null ? Text(store.hours!, style: TextStyle(fontSize: 12, color: AppColors.textTertiary)) : null,
+                  onTap: () {
+                    storeProv.selectStore(store);
+                    Navigator.pop(ctx);
+                    _fetchProducts(reset: true);
+                  },
+                );
+              }),
+              const SizedBox(height: S.x16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   List<String> _subs() {
     final cat = _cats[_tabCtrl.index];
     if (cat == 'Все' || cat == ProductCategory.sale) return [];
@@ -168,9 +215,41 @@ class _CatalogScreenState extends State<CatalogScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final storeProv = context.watch<StoreProvider>();
+
     return SafeArea(
       child: Column(
         children: [
+          // Store selector
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.x16, S.x8, S.x16, 0),
+            child: GestureDetector(
+              onTap: () => _showStorePicker(context, storeProv),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: S.x12, vertical: S.x8),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(R.md),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.storefront_rounded, size: 16, color: AppColors.accent),
+                    const SizedBox(width: S.x8),
+                    Expanded(
+                      child: Text(
+                        storeProv.selectedStoreName ?? 'Выберите магазин',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Icon(Icons.expand_more_rounded, size: 18, color: AppColors.textTertiary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // Search
           Padding(
             padding: const EdgeInsets.fromLTRB(S.x16, S.x8, S.x16, 0),

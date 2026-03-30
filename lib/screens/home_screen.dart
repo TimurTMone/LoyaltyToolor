@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../providers/store_provider.dart';
 import '../models/loyalty.dart';
 import '../models/product.dart';
 import '../screens/product_detail_screen.dart';
@@ -40,9 +41,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Future<void> _fetchProducts() async {
     try {
+      final Map<String, dynamic> params = {'per_page': 20};
+      final storeId = context.read<StoreProvider>().selectedStoreId;
+      if (storeId != null) params['location_id'] = storeId;
+
       final response = await ApiService.dio.get(
         '/api/v1/products',
-        queryParameters: {'per_page': 20},
+        queryParameters: params,
       );
       final items = (response.data['items'] as List)
           .map((json) => Product.fromJson(json as Map<String, dynamic>))

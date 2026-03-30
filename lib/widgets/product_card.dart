@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/favorites_provider.dart';
+import '../providers/store_provider.dart';
 import '../theme/app_theme.dart';
 
 /// E-commerce product card following Shopify/SSENSE patterns:
@@ -37,7 +38,16 @@ class ProductCard extends StatelessWidget {
                 children: [
                   _image(),
                   if (product.isOnSale) _saleBadge(),
-                  if (product.stock != null) _stockBadge(),
+                  Builder(builder: (ctx) {
+                    final storeId = ctx.read<StoreProvider>().selectedStoreId;
+                    if (storeId != null && product.storeAvailability != null) {
+                      final qty = product.stockAtStore(storeId);
+                      if (qty > 0 && qty <= 5) return _stockBadgeWithQty(qty);
+                    } else if (product.stock != null) {
+                      return _stockBadgeWithQty(product.stock!);
+                    }
+                    return const SizedBox.shrink();
+                  }),
                   _favButton(),
                 ],
               ),
@@ -96,7 +106,7 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _stockBadge() {
+  Widget _stockBadgeWithQty(int qty) {
     return Positioned(
       bottom: S.x8,
       left: S.x8,
@@ -107,7 +117,7 @@ class ProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(R.xs),
         ),
         child: Text(
-          'Осталось ${product.stock} шт',
+          'Осталось $qty шт',
           style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.3),
         ),
       ),

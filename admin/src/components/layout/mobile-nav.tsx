@@ -12,6 +12,7 @@ import {
   Ticket,
   MapPin,
   Bell,
+  Warehouse,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ const iconMap: Record<string, LucideIcon> = {
   Ticket,
   MapPin,
   Bell,
+  Warehouse,
 };
 
 interface MobileNavProps {

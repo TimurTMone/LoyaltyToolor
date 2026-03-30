@@ -7,6 +7,7 @@ import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/favorites_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/store_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/catalog_screen.dart';
@@ -54,6 +55,7 @@ class ToolorApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => StoreProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: Consumer<ThemeProvider>(
@@ -92,6 +94,7 @@ class _MainShellState extends State<MainShell> {
   int _tab = 0;
   bool _notificationsStarted = false;
   bool _sessionChecked = false;
+  bool _storeInitialized = false;
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +105,14 @@ class _MainShellState extends State<MainShell> {
       _sessionChecked = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         auth.tryRestoreSession();
+      });
+    }
+
+    // Initialize store provider once
+    if (!_storeInitialized) {
+      _storeInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<StoreProvider>().init();
       });
     }
 
