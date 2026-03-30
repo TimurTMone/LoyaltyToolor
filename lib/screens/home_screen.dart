@@ -137,8 +137,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                     const SizedBox(height: S.x12),
                     TextButton(
-                      onPressed: () { HapticFeedback.lightImpact(); auth.demoLogin(); },
-                      child: Text('Попробовать демо', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+                      onPressed: () { HapticFeedback.lightImpact(); Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthScreen())); },
+                      child: Text('Создать аккаунт', style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                     ),
                   ],
                 ),

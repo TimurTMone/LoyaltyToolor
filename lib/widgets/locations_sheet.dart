@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 enum LocationType { store, storeSoon, vending, bus }
 
 class ToolorLocation {
+  final String? id;
   final String name;
   final String address;
   final LocationType type;
@@ -13,6 +14,7 @@ class ToolorLocation {
   final String? note;
 
   const ToolorLocation({
+    this.id,
     required this.name,
     required this.address,
     required this.type,
@@ -41,6 +43,7 @@ class ToolorLocation {
         type = LocationType.store;
     }
     return ToolorLocation(
+      id: json['id']?.toString(),
       name: json['name'] as String? ?? '',
       address: json['address'] as String? ?? '',
       type: type,

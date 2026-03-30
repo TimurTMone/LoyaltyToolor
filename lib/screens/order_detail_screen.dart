@@ -553,7 +553,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   String _paymentLabel(String method) => switch (method) {
-        'mbank_qr' => 'MBank QR',
+        'finik' => 'Finik Pay',
         'cash' => 'Наличные',
         'card' => 'Карта',
         _ => method,

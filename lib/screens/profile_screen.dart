@@ -8,6 +8,7 @@ import '../providers/favorites_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/theme_provider.dart';
 import '../models/user.dart';
+import 'auth_screen.dart';
 import '../models/loyalty.dart';
 import '../theme/app_theme.dart';
 import '../widgets/locations_sheet.dart';
@@ -33,13 +34,13 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
-        if (!auth.isLoggedIn) return _loggedOut(auth);
+        if (!auth.isLoggedIn) return _loggedOut(context, auth);
         return _profile(context, auth);
       },
     );
   }
 
-  Widget _loggedOut(AuthProvider auth) {
+  Widget _loggedOut(BuildContext context, AuthProvider auth) {
     return SafeArea(
       child: Center(
         child: Padding(
@@ -51,7 +52,7 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: S.x16),
               Text('Войдите для доступа', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
               const SizedBox(height: S.x24),
-              SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => auth.demoLogin(), child: const Text('ВОЙТИ'))),
+              SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthScreen())), child: const Text('ВОЙТИ'))),
             ],
           ),
         ),

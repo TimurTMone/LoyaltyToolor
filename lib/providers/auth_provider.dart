@@ -237,92 +237,6 @@ class AuthProvider extends ChangeNotifier {
 
   // ── Demo fallback ─────────────────────────────────────────────────────
 
-  /// Demo login for MVP — uses hardcoded data. Prefer login() for real auth.
-  void demoLogin() {
-    debugPrint(
-        '[AuthProvider] WARNING: demoLogin() used — this is a fallback with '
-        'fake data. Use login(phone, password) for real authentication.');
-
-    _user = AppUser(
-      id: 'usr_001',
-      name: 'Алия Садыкова',
-      phone: '+996 555 123 456',
-      email: 'aliya@example.com',
-      birthDate: DateTime(1995, 6, 15),
-    );
-
-    _loyalty = LoyaltyAccount(
-      id: 'loy_001',
-      qrCode: 'TOOLOR-USR001-2026',
-      tier: LoyaltyTier.silver,
-      points: 2450,
-      totalSpent: 78500,
-      transactions: [
-        LoyaltyTransaction(
-          id: 'txn_001',
-          date: DateTime(2026, 3, 20),
-          amount: 8990,
-          pointsEarned: 450,
-          description: 'Куртка женская TOOLOR Wind',
-          type: TransactionType.purchase,
-        ),
-        LoyaltyTransaction(
-          id: 'txn_002',
-          date: DateTime(2026, 3, 15),
-          amount: 5490,
-          pointsEarned: 275,
-          description: 'Худи мужская TOOLOR Urban',
-          type: TransactionType.purchase,
-        ),
-        LoyaltyTransaction(
-          id: 'txn_003',
-          date: DateTime(2026, 3, 10),
-          amount: 3990,
-          pointsEarned: 200,
-          description: 'Футболка женская TOOLOR Basic',
-          type: TransactionType.purchase,
-        ),
-        LoyaltyTransaction(
-          id: 'txn_004',
-          date: DateTime(2026, 3, 5),
-          amount: 0,
-          pointsEarned: 500,
-          description: 'Бонус за регистрацию',
-          type: TransactionType.bonus,
-        ),
-        LoyaltyTransaction(
-          id: 'txn_005',
-          date: DateTime(2026, 2, 28),
-          amount: 12990,
-          pointsEarned: 650,
-          description: 'Пуховик TOOLOR Nomad',
-          type: TransactionType.purchase,
-        ),
-        LoyaltyTransaction(
-          id: 'txn_006',
-          date: DateTime(2026, 2, 20),
-          amount: -1500,
-          pointsEarned: -300,
-          description: 'Списание баллов',
-          type: TransactionType.pointsRedeemed,
-        ),
-        LoyaltyTransaction(
-          id: 'txn_007',
-          date: DateTime(2026, 2, 14),
-          amount: 0,
-          pointsEarned: 200,
-          description: 'Реферальный бонус',
-          type: TransactionType.referral,
-        ),
-      ],
-    );
-
-    _isLoggedIn = true;
-    _error = null;
-    startQrRefresh();
-    notifyListeners();
-  }
-
   // ── Logout ────────────────────────────────────────────────────────────
 
   Future<void> logout() async {
@@ -349,18 +263,4 @@ class AuthProvider extends ChangeNotifier {
 
   // ── Helpers ───────────────────────────────────────────────────────────
 
-  String _extractErrorMessage(dynamic e) {
-    if (e is Exception) {
-      // Try to extract backend detail from DioException
-      try {
-        final dynamic err = e;
-        final response = err.response;
-        if (response != null && response.data is Map) {
-          final detail = response.data['detail'];
-          if (detail is String) return detail;
-        }
-      } catch (_) {}
-    }
-    return e.toString();
-  }
 }

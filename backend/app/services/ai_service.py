@@ -226,7 +226,7 @@ async def generate_ai_reply(
         logger.error(f"Claude API error: {e}")
         # Graceful fallback
         return (
-            "Извините, сейчас я не могу ответить. Попробуйте позже или напишите нам в WhatsApp! 📱",
+            "Извините, сейчас я не могу ответить. Попробуйте позже! 🔄",
             [],
         )
 

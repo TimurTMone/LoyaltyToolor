@@ -200,14 +200,14 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Demo mode link
+                  // Skip hint
                   TextButton(
                     onPressed: () {
                       HapticFeedback.lightImpact();
-                      auth.demoLogin();
+                      Navigator.pop(context);
                     },
                     child: Text(
-                      'Попробовать демо',
+                      'Пропустить',
                       style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
                     ),
                   ),

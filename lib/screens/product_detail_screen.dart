@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
@@ -209,30 +208,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                       const SizedBox(height: S.x12),
 
-                      // WhatsApp button
-                      GestureDetector(
-                        onTap: () => _openWhatsApp(p),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(S.x16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF25D366).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(R.md),
-                            border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.chat_rounded, size: 18, color: const Color(0xFF25D366)),
-                              const SizedBox(width: S.x8),
-                              Text('Написать в WhatsApp', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF25D366))),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: S.x12),
-
                       // Info card
                       Container(
                         padding: const EdgeInsets.all(S.x16),
@@ -365,12 +340,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     HapticFeedback.selectionClick();
     final price = p.isOnSale ? '${p.formattedPrice} (было ${p.formattedOriginalPrice})' : p.formattedPrice;
     SharePlus.instance.share(ShareParams(text: '${p.name} — $price\n\nСмотри в TOOLOR 👉 toolorkg.com'));
-  }
-
-  void _openWhatsApp(Product p) {
-    HapticFeedback.selectionClick();
-    final message = Uri.encodeComponent('Здравствуйте! Хочу узнать про "${p.name}" (${p.formattedPrice})');
-    launchUrl(Uri.parse('https://wa.me/996999955000?text=$message'), mode: LaunchMode.externalApplication);
   }
 
   void _addToCart(Product p) {
