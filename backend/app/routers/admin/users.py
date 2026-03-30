@@ -66,11 +66,17 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession = Depends(get_db)
 
 @router.patch("/{user_id}", response_model=UserOut)
 async def update_user(
-    user_id: uuid.UUID, body: AdminUserUpdate, db: AsyncSession = Depends(get_db)
+    user_id: uuid.UUID,
+    body: AdminUserUpdate,
+    current_user: Profile = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
 ):
     user = await db.get(Profile, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Prevent removing your own admin access
+    if user.id == current_user.id and body.is_admin is False:
+        raise HTTPException(status_code=400, detail="Нельзя снять админ-права с себя")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(user, field, value)
     await db.commit()
