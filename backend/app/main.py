@@ -48,11 +48,22 @@ async def _keep_alive():
             await asyncio.sleep(780)  # 13 minutes
 
 
+async def _auto_migrate():
+    """Create all tables on first start if they don't exist."""
+    from app.database import engine, Base
+    # Import all models so Base.metadata knows about them
+    from app.models import user, loyalty, product, order, cart, chat, notification, promo_code, location, referral  # noqa: F401
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not IS_VERCEL:
         for sub in ("payment-proofs", "product-images", "avatars"):
             Path(settings.UPLOAD_DIR, sub).mkdir(parents=True, exist_ok=True)
+    # Auto-create tables if needed (new DB)
+    await _auto_migrate()
     # Keep-alive task for Render free tier
     task = asyncio.create_task(_keep_alive())
     yield
@@ -123,6 +134,73 @@ app.include_router(admin_notifications.router, prefix="/api/v1/admin/notificatio
 @app.get("/api/v1/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.post("/api/v1/admin/migrate-from-neon")
+async def migrate_from_neon():
+    """One-time migration: copy data from Neon to current DB. Remove after use."""
+    import asyncpg as apg
+    from app.database import engine
+
+    neon_url = "postgresql://neondb_owner:npg_3NKgvsFrW5io@ep-blue-boat-amiwae15-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require"
+
+    src = await apg.connect(neon_url)
+    # Get all table names
+    tables = await src.fetch(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"
+    )
+    table_names = [t['tablename'] for t in tables if t['tablename'] != 'alembic_version']
+
+    # Also copy sequences
+    seqs = await src.fetch(
+        "SELECT sequencename FROM pg_sequences WHERE schemaname = 'public'"
+    )
+
+    results = {}
+    raw_url = str(engine.url).replace("+asyncpg", "")
+    # Remove sslmode params for internal render connection
+    for p in ("?sslmode=require", "&sslmode=require"):
+        raw_url = raw_url.replace(p, "")
+    if "?" not in raw_url:
+        raw_url = raw_url.split("?")[0]
+
+    dst = await apg.connect(raw_url)
+
+    # Create sequences first
+    for seq in seqs:
+        name = seq['sequencename']
+        try:
+            val = await src.fetchval(f"SELECT last_value FROM {name}")
+            await dst.execute(f"CREATE SEQUENCE IF NOT EXISTS {name}")
+            await dst.execute(f"SELECT setval('{name}', {val})")
+            results[f"seq_{name}"] = val
+        except Exception as e:
+            results[f"seq_{name}"] = str(e)
+
+    for tname in table_names:
+        try:
+            rows = await src.fetch(f"SELECT * FROM {tname}")
+            if not rows:
+                results[tname] = 0
+                continue
+            cols = list(rows[0].keys())
+            # Clear destination table
+            await dst.execute(f"DELETE FROM {tname}")
+            # Insert rows
+            for row in rows:
+                placeholders = ", ".join(f"${i+1}" for i in range(len(cols)))
+                col_names = ", ".join(f'"{c}"' for c in cols)
+                await dst.execute(
+                    f'INSERT INTO "{tname}" ({col_names}) VALUES ({placeholders})',
+                    *[row[c] for c in cols]
+                )
+            results[tname] = len(rows)
+        except Exception as e:
+            results[tname] = str(e)
+
+    await src.close()
+    await dst.close()
+    return {"migrated": results}
 
 
 @app.get("/api/v1/img")
