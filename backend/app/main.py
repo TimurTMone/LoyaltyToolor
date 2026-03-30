@@ -146,10 +146,13 @@ async def migrate_from_neon():
 
     src = await apg.connect(neon_url)
     # Get all table names
-    tables = await src.fetch(
-        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"
-    )
-    table_names = [t['tablename'] for t in tables if t['tablename'] != 'alembic_version']
+    # Order matters: parent tables first to satisfy foreign keys
+    table_names = [
+        "profiles", "categories", "subcategories", "products", "locations",
+        "loyalty_accounts", "loyalty_transactions", "promo_codes",
+        "orders", "order_items", "cart_items", "favorites",
+        "chat_sessions", "chat_messages", "notifications", "referrals",
+    ]
 
     # Also copy sequences
     seqs = await src.fetch(
