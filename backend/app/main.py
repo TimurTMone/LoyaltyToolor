@@ -142,7 +142,7 @@ async def migrate_from_neon():
     import asyncpg as apg
     from app.database import engine
 
-    neon_url = "postgresql://neondb_owner:npg_3NKgvsFrW5io@ep-blue-boat-amiwae15-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require"
+    neon_url = "postgresql://neondb_owner:npg_3NKgvsFrW5io@ep-blue-boat-amiwae15.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require"
 
     src = await apg.connect(neon_url)
     # Get all table names
@@ -157,14 +157,13 @@ async def migrate_from_neon():
     )
 
     results = {}
-    raw_url = str(engine.url).replace("+asyncpg", "")
+    # Build destination URL from settings (internal Render Postgres)
+    dst_url = settings.DATABASE_URL.replace("+asyncpg", "")
     # Remove sslmode params for internal render connection
     for p in ("?sslmode=require", "&sslmode=require"):
-        raw_url = raw_url.replace(p, "")
-    if "?" not in raw_url:
-        raw_url = raw_url.split("?")[0]
+        dst_url = dst_url.replace(p, "")
 
-    dst = await apg.connect(raw_url)
+    dst = await apg.connect(dst_url)
 
     # Create sequences first
     for seq in seqs:
