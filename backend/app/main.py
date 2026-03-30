@@ -93,11 +93,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# CORS
+# CORS — allow all origins since auth is token-based (not cookie-based)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
