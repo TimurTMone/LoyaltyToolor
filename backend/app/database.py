@@ -13,7 +13,7 @@ for _param in ("sslmode=require", "sslmode=verify-full", "channel_binding=requir
     _db_url = _db_url.replace(f"?{_param}", "")
 
 # Use SSL for Neon / cloud Postgres
-_connect_args = {}
+_connect_args: dict = {}
 if "neon.tech" in settings.DATABASE_URL or "sslmode=require" in settings.DATABASE_URL:
     try:
         import certifi
@@ -21,6 +21,10 @@ if "neon.tech" in settings.DATABASE_URL or "sslmode=require" in settings.DATABAS
     except ImportError:
         _ssl_ctx = _ssl.create_default_context()
     _connect_args = {"ssl": _ssl_ctx}
+    # Neon's connection pooler doesn't support prepared statements —
+    # disable the cache to avoid stale-schema errors after migrations.
+    if "pooler" in settings.DATABASE_URL:
+        _connect_args["prepared_statement_cache_size"] = 0
 
 engine = create_async_engine(
     _db_url,
