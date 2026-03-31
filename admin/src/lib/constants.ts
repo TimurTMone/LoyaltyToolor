@@ -1,7 +1,6 @@
 export const ORDER_STATUSES = [
   { value: "pending", label: "Ожидает" },
-  { value: "payment_uploaded", label: "Оплата загружена" },
-  { value: "payment_confirmed", label: "Оплата подтверждена" },
+  { value: "payment_confirmed", label: "Оплачен" },
   { value: "processing", label: "В обработке" },
   { value: "shipped", label: "Отправлен" },
   { value: "delivered", label: "Доставлен" },

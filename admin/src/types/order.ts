@@ -24,7 +24,6 @@ export interface Order {
   total: number;
   currency: string;
   payment_method: string;
-  payment_proof_url: string | null;
   delivery_address: string | null;
   delivery_type: string;
   delivery_notes: string | null;

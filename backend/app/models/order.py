@@ -25,7 +25,6 @@ class Order(Base):
     total: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String, default="KGS")
     payment_method: Mapped[str | None] = mapped_column(String, nullable=True)
-    payment_proof_url: Mapped[str | None] = mapped_column(String, nullable=True)
     payment_transaction_id: Mapped[str | None] = mapped_column(String, nullable=True)
     payment_provider: Mapped[str | None] = mapped_column(String, nullable=True)
     delivery_address: Mapped[str | None] = mapped_column(String, nullable=True)

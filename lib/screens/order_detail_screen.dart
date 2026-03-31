@@ -25,7 +25,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   bool get _canCancel =>
-      _order.status == 'pending' || _order.status == 'payment_uploaded' || _order.status == 'created';
+      _order.status == 'pending' || _order.status == 'created';
 
   Future<void> _cancelOrder() async {
     final confirm = await showDialog<bool>(

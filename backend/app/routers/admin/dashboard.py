@@ -26,7 +26,7 @@ async def get_dashboard(db: AsyncSession = Depends(get_db)):
     pending_orders = (
         await db.execute(
             select(func.count(Order.id)).where(
-                Order.status.in_(["pending", "payment_uploaded"])
+                Order.status.in_(["pending"])
             )
         )
     ).scalar() or 0

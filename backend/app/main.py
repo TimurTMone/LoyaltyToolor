@@ -46,7 +46,7 @@ async def _auto_migrate():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not IS_VERCEL:
-        for sub in ("payment-proofs", "product-images", "avatars"):
+        for sub in ("product-images", "avatars"):
             Path(settings.UPLOAD_DIR, sub).mkdir(parents=True, exist_ok=True)
     # Auto-create tables if needed (new DB)
     await _auto_migrate()

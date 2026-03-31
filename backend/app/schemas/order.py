@@ -30,7 +30,6 @@ class OrderOut(BaseModel):
     total: Decimal
     currency: str
     payment_method: str | None = None
-    payment_proof_url: str | None = None
     payment_transaction_id: str | None = None
     payment_provider: str | None = None
     delivery_address: str | None = None
@@ -63,7 +62,6 @@ class OrderCreate(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: Literal[
         "pending",
-        "payment_uploaded",
         "payment_confirmed",
         "processing",
         "ready_for_pickup",
