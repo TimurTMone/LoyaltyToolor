@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -57,20 +56,6 @@ class _AuthScreenState extends State<AuthScreen> {
       final referral = _referralCtrl.text.trim();
       await auth.register(phone, password, name, referralCode: referral.isNotEmpty ? referral : null);
     }
-
-    if (!mounted) return;
-
-    if (auth.error != null) {
-      _showError(auth.error!);
-      auth.clearError();
-    } else if (auth.isLoggedIn) {
-      Navigator.of(context).pop();
-    }
-  }
-
-  Future<void> _appleSignIn() async {
-    final auth = context.read<AuthProvider>();
-    await auth.signInWithApple();
 
     if (!mounted) return;
 
@@ -212,40 +197,6 @@ class _AuthScreenState extends State<AuthScreen> {
                           : Text(_isLogin ? 'ВОЙТИ' : 'СОЗДАТЬ АККАУНТ'),
                     ),
                   ),
-
-                  // Apple Sign In (iOS only)
-                  if (Platform.isIOS) ...[
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(child: Divider(color: AppColors.divider)),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text('или', style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
-                        ),
-                        Expanded(child: Divider(color: AppColors.divider)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton.icon(
-                        onPressed: auth.isLoading ? null : () {
-                          HapticFeedback.mediumImpact();
-                          _appleSignIn();
-                        },
-                        icon: const Icon(Icons.apple, size: 22),
-                        label: const Text('Войти через Apple'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimary,
-                          side: BorderSide(color: AppColors.divider),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  ],
 
                   const SizedBox(height: 16),
 

@@ -1,10 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../models/user.dart';
 import '../models/loyalty.dart';
 import '../services/api_service.dart';
@@ -128,93 +124,6 @@ class AuthProvider extends ChangeNotifier {
     }
     _isLoading = false;
     notifyListeners();
-  }
-
-  /// Sign in with Apple — launches native Apple auth, sends identity token to backend.
-  Future<void> signInWithApple() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      // Generate nonce for security
-      final rawNonce = _generateNonce();
-      final nonce = sha256.convert(utf8.encode(rawNonce)).toString();
-
-      Analytics.appleSignIn();
-      final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        nonce: nonce,
-      );
-
-      final identityToken = credential.identityToken;
-      if (identityToken == null) {
-        _error = 'Apple не вернул токен авторизации';
-        _isLoading = false;
-        notifyListeners();
-        return;
-      }
-
-      // Build full name from Apple credential (only comes on first auth)
-      String? fullName;
-      if (credential.givenName != null || credential.familyName != null) {
-        fullName = [credential.givenName, credential.familyName]
-            .where((s) => s != null && s.isNotEmpty)
-            .join(' ');
-        if (fullName.isEmpty) fullName = null;
-      }
-
-      // Send to backend
-      await ApiService.appleAuth(identityToken, fullName: fullName);
-    } catch (e) {
-      if (e is SignInWithAppleAuthorizationException) {
-        if (e.code == AuthorizationErrorCode.canceled) {
-          // User cancelled — not an error
-          _isLoading = false;
-          notifyListeners();
-          return;
-        }
-      }
-      _error = 'Ошибка Apple Sign In: $e';
-      _isLoggedIn = false;
-      _isLoading = false;
-      notifyListeners();
-      return;
-    }
-
-    try {
-      await fetchProfile();
-    } catch (e) {
-      _error = 'Ошибка профиля: $e';
-      _isLoggedIn = false;
-      _isLoading = false;
-      notifyListeners();
-      return;
-    }
-
-    try {
-      await fetchLoyalty();
-    } catch (e) {
-      debugPrint('[AuthProvider] fetchLoyalty error: $e');
-    }
-
-    _isLoggedIn = true;
-    startQrRefresh();
-    if (_user != null) {
-      Analytics.identify(_user!.id, phone: _user!.phone, name: _user!.name, tier: _loyalty?.tierName);
-    }
-    _isLoading = false;
-    notifyListeners();
-  }
-
-  /// Generate a random nonce string for Apple Sign In.
-  String _generateNonce([int length = 32]) {
-    const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
-    final random = Random.secure();
-    return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
   }
 
   /// Fetch user profile from GET /api/v1/users/me.

@@ -66,15 +66,6 @@ class Analytics {
     track('qr_scanned');
   }
 
-  // ── Apple auth ──────────────────────────────────────────────────────
-  static void appleSignIn() {
-    track('apple_sign_in_attempt');
-  }
-
-  static void appleSignInSuccess() {
-    track('apple_sign_in_success');
-  }
-
   // ── Session & engagement ────────────────────────────────────────────
   static void appOpen() {
     track('app_open');

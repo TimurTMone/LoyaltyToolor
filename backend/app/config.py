@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     ANTHROPIC_API_KEY: str = ""
     MIXPANEL_TOKEN: str = ""
-    APPLE_BUNDLE_ID: str = "com.toolor.toolorApp"
 
     @property
     def cors_origins_list(self) -> list[str]:
