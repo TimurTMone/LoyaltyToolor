@@ -3,7 +3,7 @@ WORKDIR /app
 COPY pubspec.yaml pubspec.lock ./
 RUN flutter pub get
 COPY . .
-ARG API_URL=https://loyaltytoolor.onrender.com
+ARG API_URL=https://loyaltytoolor-xwwj.onrender.com
 RUN flutter build web --release --dart-define=API_URL=$API_URL
 
 FROM nginx:alpine

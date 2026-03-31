@@ -17,7 +17,7 @@ services:
       - key: QR_SECRET
         value: toolor-qr-secret-2024
       - key: CORS_ORIGINS
-        value: '["https://toolor-admin.onrender.com","https://loyaltytoolor.onrender.com","https://toolor-app.onrender.com","http://localhost:3000"]'
+        value: '["https://toolor-admin.onrender.com","https://loyaltytoolor-xwwj.onrender.com","https://toolor-app.onrender.com","http://localhost:3000"]'
       - key: ADMIN_PHONE
         value: "+996999955000"
       - key: UPLOAD_DIR
@@ -35,7 +35,7 @@ services:
     autoDeploy: true
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        value: https://loyaltytoolor.onrender.com
+        value: https://loyaltytoolor-xwwj.onrender.com
       - key: NODE_ENV
         value: production
 

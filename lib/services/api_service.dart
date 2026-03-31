@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 const _envUrl = String.fromEnvironment('API_URL', defaultValue: '');
 final String apiBaseUrl = _envUrl.isNotEmpty
     ? _envUrl
-    : 'https://loyaltytoolor.onrender.com';
+    : 'https://loyaltytoolor-xwwj.onrender.com';
 
 /// Dio-based HTTP client singleton.
 /// Call [init] once in main() before runApp().
@@ -151,30 +151,6 @@ class ApiService {
     final response = await _dio.post(
       '/api/v1/auth/login',
       data: {'phone': phone, 'password': password},
-    );
-
-    final data = response.data as Map<String, dynamic>;
-    final access = data['access_token'] as String?;
-    final refresh = data['refresh_token'] as String?;
-
-    if (access != null && refresh != null) {
-      await setTokens(access, refresh);
-    }
-
-    return data;
-  }
-
-  /// POST /api/v1/auth/apple — Sign in with Apple identity token.
-  static Future<Map<String, dynamic>> appleAuth(
-    String identityToken, {
-    String? fullName,
-  }) async {
-    final response = await _dio.post(
-      '/api/v1/auth/apple',
-      data: {
-        'identity_token': identityToken,
-        if (fullName != null) 'full_name': fullName,
-      },
     );
 
     final data = response.data as Map<String, dynamic>;
