@@ -28,9 +28,10 @@ platform :ios do
          "--export-options-plist=ios/ExportOptions.plist")
     end
 
+    ipa_path = File.expand_path("../build/ios/ipa/toolor_app.ipa", __dir__)
     upload_to_testflight(
       api_key: api_key,
-      ipa: "../build/ios/ipa/toolor_app.ipa",
+      ipa: ipa_path,
       skip_waiting_for_build_processing: true,
     )
   end

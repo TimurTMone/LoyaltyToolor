@@ -2,10 +2,6 @@
 app_identifier("com.toolor.toolorApp")
 team_id("PJPHU42VG4")
 
-# App Store Connect API
-apple_api_key_id("J7P3F59H9M")
-apple_api_issuer_id("bba04448-ff86-400c-8a1c-9828ce554f07")
-
 # Android
-json_key_file("fastlane/play-store-key.json") # Path to Google Play service account JSON
+json_key_file("fastlane/play-store-key.json")
 package_name("com.toolor.toolor_app")
