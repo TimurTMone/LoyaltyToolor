@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../main.dart';
 
 const _brandBlue = Color(0xFF0033A0);
 const _brandBlueLight = Color(0xFF1A5EC7);
@@ -126,7 +127,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
       await Future.delayed(const Duration(milliseconds: 1000));
       if (!mounted) return;
-      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainShell()),
+        (route) => false,
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);

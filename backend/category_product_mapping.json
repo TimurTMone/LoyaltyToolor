@@ -1,0 +1,522 @@
+{
+  "categories": [
+    {
+      "url": "/product-category/muzhchinam/",
+      "slug": "muzhchinam",
+      "name": "Мужчинам",
+      "parent": null,
+      "products": [
+        "/product/dlinnyj-puhovik-s-kapyushonom/",
+        "/product/korotkaya-kurtka/",
+        "/product/korotkaya-kurtka-s-kapyushonom/",
+        "/product/korotkaya-kurtka-s-kapyushonom-2/",
+        "/product/korotkaya-kurtka-s-kapyushonom-3/",
+        "/product/2794/",
+        "/product/muzhskaya-vetrovka-iz-kollektsii-wellness/",
+        "/product/muzhskaya-vetrovka-s-kapyushonom/",
+        "/product/muzhskaya-vodolazka/",
+        "/product/muzhskaya-dvuhstoronnyaya-kurtka/",
+        "/product/muzhskaya-zamshevaya-kurtka-iz-kollektsii-sandyk/",
+        "/product/muzhskaya-kurtka-s-napolnitelem/",
+        "/product/muzhskaya-rubashka/",
+        "/product/muzhskaya-flisovaya-kurtka/",
+        "/product/muzhskaya-futbolka/",
+        "/product/muzhskaya-futbolka-wellness/",
+        "/product/muzhskaya-futbolka-oversajz/",
+        "/product/muzhskaya-futbolka-reglan-s-vyshivkoj/",
+        "/product/muzhskaya-futbolka-reglan-s-printom/",
+        "/product/muzhskaya-futbolka-s-printom/",
+        "/product/muzhskaya-futbolka-yurta/",
+        "/product/muzhskaya-futbolka-varenka-2/",
+        "/product/muzhskaya-futbolka-varenka/",
+        "/product/muzhskie-bryuki-3/",
+        "/product/muzhskie-bryuki-2/",
+        "/product/muzhskie-bryuki/",
+        "/product/muzhskie-vafelnye-bryuki/",
+        "/product/muzhskie-sportivnye-bryuki-2/",
+        "/product/muzhskie-sportivnye-bryuki/",
+        "/product/muzhskie-sherstyanye-bryuki/",
+        "/product/muzhskie-shorty/",
+        "/product/muzhskoe-hudi-balaklava/",
+        "/product/muzhskoj-vyazannyj-poluzamok/",
+        "/product/muzhskoj-kardigan/",
+        "/product/muzhskoj-longsliv/",
+        "/product/muzhskoj-longsliv-s-vyshivkoj/",
+        "/product/muzhskoj-longsliv-s-printom/",
+        "/product/muzhskoj-longsliv-s-printom-2/",
+        "/product/muzhskoj-poluzamok/",
+        "/product/muzhskoj-sviter/",
+        "/product/muzhskoj-svitshot/",
+        "/product/muzhskoj-svitshot-bryuki/",
+        "/product/muzhskoj-hudi/",
+        "/product/stegannyj-lajtdaun/",
+        "/product/udlinennyj-muzhskoj-puhovik/",
+        "/product/udlinennyj-muzhskoj-puhovik-2/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/kurtki-muzhchinam/",
+      "slug": "kurtki-muzhchinam",
+      "name": "Куртки",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/dlinnyj-puhovik-s-kapyushonom/",
+        "/product/korotkaya-kurtka/",
+        "/product/korotkaya-kurtka-s-kapyushonom/",
+        "/product/korotkaya-kurtka-s-kapyushonom-2/",
+        "/product/korotkaya-kurtka-s-kapyushonom-3/",
+        "/product/muzhskaya-vetrovka-iz-kollektsii-wellness/",
+        "/product/muzhskaya-dvuhstoronnyaya-kurtka/",
+        "/product/muzhskaya-zamshevaya-kurtka-iz-kollektsii-sandyk/",
+        "/product/muzhskaya-kurtka-s-napolnitelem/",
+        "/product/udlinennyj-muzhskoj-puhovik/",
+        "/product/udlinennyj-muzhskoj-puhovik-2/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/lajtdaun/",
+      "slug": "lajtdaun",
+      "name": "Лайтдаун",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/stegannyj-lajtdaun/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/longslivy/",
+      "slug": "longslivy",
+      "name": "Лонгсливы",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/muzhskoj-longsliv/",
+        "/product/muzhskoj-longsliv-s-vyshivkoj/",
+        "/product/muzhskoj-longsliv-s-printom/",
+        "/product/muzhskoj-longsliv-s-printom-2/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/rubashki/",
+      "slug": "rubashki",
+      "name": "Рубашки",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/2794/",
+        "/product/muzhskaya-rubashka/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/sviter-muzhchinam/",
+      "slug": "sviter-muzhchinam",
+      "name": "Свитер",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/muzhskoj-vyazannyj-poluzamok/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/flis/",
+      "slug": "flis",
+      "name": "Флис",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/muzhskaya-flisovaya-kurtka/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/bryuki/",
+      "slug": "bryuki",
+      "name": "Брюки",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/muzhskie-bryuki-3/",
+        "/product/muzhskie-bryuki-2/",
+        "/product/muzhskie-bryuki/",
+        "/product/muzhskie-vafelnye-bryuki/",
+        "/product/muzhskie-sportivnye-bryuki-2/",
+        "/product/muzhskie-sportivnye-bryuki/",
+        "/product/muzhskie-sherstyanye-bryuki/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/vyazannyj-trikotazh/",
+      "slug": "vyazannyj-trikotazh",
+      "name": "Вязанный трикотаж",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/muzhskaya-vodolazka/",
+        "/product/muzhskoj-vyazannyj-poluzamok/",
+        "/product/muzhskoj-kardigan/",
+        "/product/muzhskoj-sviter/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/futbolki/",
+      "slug": "futbolki",
+      "name": "Футболки",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/muzhskaya-futbolka/",
+        "/product/muzhskaya-futbolka-wellness/",
+        "/product/muzhskaya-futbolka-oversajz/",
+        "/product/muzhskaya-futbolka-reglan-s-vyshivkoj/",
+        "/product/muzhskaya-futbolka-reglan-s-printom/",
+        "/product/muzhskaya-futbolka-s-printom/",
+        "/product/muzhskaya-futbolka-yurta/",
+        "/product/muzhskaya-futbolka-varenka-2/",
+        "/product/muzhskaya-futbolka-varenka/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/svitshoty/",
+      "slug": "svitshoty",
+      "name": "Свитшоты",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/muzhskoj-poluzamok/",
+        "/product/muzhskoj-svitshot/",
+        "/product/muzhskoj-svitshot-bryuki/"
+      ]
+    },
+    {
+      "url": "/product-category/muzhchinam/hudi/",
+      "slug": "hudi",
+      "name": "Худи",
+      "parent": "muzhchinam",
+      "products": [
+        "/product/muzhskoe-hudi-balaklava/",
+        "/product/muzhskoj-hudi/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/",
+      "slug": "zhenshhinam",
+      "name": "Женщинам",
+      "parent": null,
+      "products": [
+        "/product/dlinnyj-puhovik-oversajz-s-poyasom/",
+        "/product/dlinnyj-puhovik-so-semnymi-sharfami/",
+        "/product/dlinnyj-puhovik-oversajz/",
+        "/product/zhenskaya-vafelnaya-rubashka/",
+        "/product/zhenskaya-vetrovka/",
+        "/product/zhenskaya-vetrovka-vafelka/",
+        "/product/zhenskaya-vetrovka-oversajz/",
+        "/product/zhenskaya-vetrovka-tensel4l/",
+        "/product/zhenskaya-vodolazka/",
+        "/product/zhenskaya-vodoottalkivayushhaya-rubashka/",
+        "/product/zhenskaya-dvojka-s-lampasami/",
+        "/product/zhenskaya-zipka-s-zavyazkoj/",
+        "/product/zhenskaya-korsetnaya-zipka-s-kapyushonom/",
+        "/product/zhenskaya-kurtka/",
+        "/product/zhenskaya-kurtka-chapan/",
+        "/product/zhenskaya-olimpijka-mikrovelvet/",
+        "/product/zhenskaya-rubashka-v-polosku/",
+        "/product/zhenskaya-rubashka-iz-kollektsii-wellness/",
+        "/product/zhenskaya-rubashka-safari/",
+        "/product/zhenskaya-sportivnaya-zipka-bez-kapyushona/",
+        "/product/zhenskaya-futbolka/",
+        "/product/zhenskaya-futbolka-oversajz-s-vyshivkoj/",
+        "/product/zhenskaya-futbolka-oversajz/",
+        "/product/zhenskaya-futbolka-reglan-s-vyshivkoj/",
+        "/product/zhenskaya-futbolka-yurta/",
+        "/product/zhenskaya-futbolka-varenka-2/",
+        "/product/zhenskaya-futbolka-varenka/",
+        "/product/zhenskaya-sherstenaya-kurtka/",
+        "/product/zhenskie-bryuki-3/",
+        "/product/zhenskie-bryuki/",
+        "/product/zhenskie-bryuki-2/",
+        "/product/zhenskie-bryuki-mikrovelvet/",
+        "/product/zhenskie-bryuki-bananki/",
+        "/product/zhenskie-bryuki-s-manzhetoj/",
+        "/product/zhenskie-bryuki-truby/",
+        "/product/zhenskie-vafelnye-bryuki/",
+        "/product/zhenskie-sportivnye-bryuki/",
+        "/product/zhenskie-stilnye-bryuki/",
+        "/product/zhenskij-bodi/",
+        "/product/zhenskij-bodi-suprem/",
+        "/product/zhenskij-kardigan/",
+        "/product/zhenskij-kostyum-svitshot-bryuki/",
+        "/product/zhenskij-krop-sviter/",
+        "/product/zhenskij-longsliv/",
+        "/product/zhenskij-longsliv-2/",
+        "/product/zhenskij-longsliv-lodochka/",
+        "/product/zhenskij-longsliv-s-vyshivkoj-2/",
+        "/product/zhenskij-longsliv-s-vyshivkoj/",
+        "/product/zhenskij-polutrench/",
+        "/product/zhenskij-sviter/",
+        "/product/zhenskij-babushkin-sviter/",
+        "/product/zhenskij-svitshot-dvojka/",
+        "/product/zhenskij-svitshot-poluzamok-wellness/",
+        "/product/zhenskij-svitshot-dvojka-2/",
+        "/product/zhenskij-sportivnyj-kostyum/",
+        "/product/zhenskij-sportivnyj-kostyum-poluzamok/",
+        "/product/zhenskij-hudi-dvojka/",
+        "/product/korotkaya-dvustoronnyaya-kurtka-transformer-2/",
+        "/product/korotkaya-dvustoronnyaya-kurtka-transformer/",
+        "/product/stegannyj-lajtdaun-2/",
+        "/product/udlinennyj-puhovik-oversajz-s-kapyushonom/",
+        "/product/udlinennyj-puhovik-oversajz-s-kapyushonom-2/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/kofta/",
+      "slug": "kofta",
+      "name": "Кофта",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-olimpijka-mikrovelvet/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/rubashki-zhenshhinam/",
+      "slug": "rubashki-zhenshhinam",
+      "name": "Рубашки",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-vafelnaya-rubashka/",
+        "/product/zhenskaya-vodoottalkivayushhaya-rubashka/",
+        "/product/zhenskaya-rubashka-v-polosku/",
+        "/product/zhenskaya-rubashka-iz-kollektsii-wellness/",
+        "/product/zhenskaya-rubashka-safari/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/bodi-zhenshinam/",
+      "slug": "bodi-zhenshinam",
+      "name": "Боди",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-rubashka-v-polosku/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/longslivy-zhenshhinam/",
+      "slug": "longslivy-zhenshhinam",
+      "name": "Лонгсливы",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskij-longsliv/",
+        "/product/zhenskij-longsliv-2/",
+        "/product/zhenskij-longsliv-lodochka/",
+        "/product/zhenskij-longsliv-s-vyshivkoj-2/",
+        "/product/zhenskij-longsliv-s-vyshivkoj/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/bodi-topy/",
+      "slug": "bodi-topy",
+      "name": "Боди/топы",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskij-bodi/",
+        "/product/zhenskij-bodi-suprem/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/sviter/",
+      "slug": "sviter",
+      "name": "Свитер",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskij-krop-sviter/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/bryuki-zhenshhinam/",
+      "slug": "bryuki-zhenshhinam",
+      "name": "Брюки",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-dvojka-s-lampasami/",
+        "/product/zhenskie-bryuki-3/",
+        "/product/zhenskie-bryuki/",
+        "/product/zhenskie-bryuki-2/",
+        "/product/zhenskie-bryuki-mikrovelvet/",
+        "/product/zhenskie-bryuki-bananki/",
+        "/product/zhenskie-bryuki-s-manzhetoj/",
+        "/product/zhenskie-bryuki-truby/",
+        "/product/zhenskie-vafelnye-bryuki/",
+        "/product/zhenskie-stilnye-bryuki/",
+        "/product/zhenskij-sportivnyj-kostyum-poluzamok/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/vetroviki-zhenshhinam/",
+      "slug": "vetroviki-zhenshhinam",
+      "name": "Ветровки",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-vetrovka/",
+        "/product/zhenskaya-vetrovka-vafelka/",
+        "/product/zhenskaya-vetrovka-oversajz/",
+        "/product/zhenskaya-vetrovka-tensel4l/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/vyazannyj-trikotazh-zhenshhinam/",
+      "slug": "vyazannyj-trikotazh-zhenshhinam",
+      "name": "Вязанный трикотаж",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-vodolazka/",
+        "/product/zhenskij-kardigan/",
+        "/product/zhenskij-sviter/",
+        "/product/zhenskij-babushkin-sviter/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/zhilety-zhenshhinam/",
+      "slug": "zhilety-zhenshhinam",
+      "name": "Жилеты",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/korotkaya-dvustoronnyaya-kurtka-transformer-2/",
+        "/product/korotkaya-dvustoronnyaya-kurtka-transformer/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/kurtki/",
+      "slug": "kurtki",
+      "name": "Куртки",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/dlinnyj-puhovik-oversajz-s-poyasom/",
+        "/product/dlinnyj-puhovik-so-semnymi-sharfami/",
+        "/product/dlinnyj-puhovik-oversajz/",
+        "/product/zhenskaya-kurtka/",
+        "/product/zhenskaya-kurtka-chapan/",
+        "/product/zhenskaya-sherstenaya-kurtka/",
+        "/product/zhenskij-polutrench/",
+        "/product/korotkaya-dvustoronnyaya-kurtka-transformer-2/",
+        "/product/korotkaya-dvustoronnyaya-kurtka-transformer/",
+        "/product/stegannyj-lajtdaun-2/",
+        "/product/udlinennyj-puhovik-oversajz-s-kapyushonom/",
+        "/product/udlinennyj-puhovik-oversajz-s-kapyushonom-2/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/svitshoty-zhenshhinam/",
+      "slug": "svitshoty-zhenshhinam",
+      "name": "Свитшоты",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-dvojka-s-lampasami/",
+        "/product/zhenskaya-sportivnaya-zipka-bez-kapyushona/",
+        "/product/zhenskie-sportivnye-bryuki/",
+        "/product/zhenskij-kostyum-svitshot-bryuki/",
+        "/product/zhenskij-svitshot-dvojka/",
+        "/product/zhenskij-svitshot-poluzamok-wellness/",
+        "/product/zhenskij-svitshot-dvojka-2/",
+        "/product/zhenskij-sportivnyj-kostyum-poluzamok/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/futbolki-zhenshhinam/",
+      "slug": "futbolki-zhenshhinam",
+      "name": "Футболки",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-futbolka/",
+        "/product/zhenskaya-futbolka-oversajz-s-vyshivkoj/",
+        "/product/zhenskaya-futbolka-oversajz/",
+        "/product/zhenskaya-futbolka-reglan-s-vyshivkoj/",
+        "/product/zhenskaya-futbolka-yurta/",
+        "/product/zhenskaya-futbolka-varenka-2/",
+        "/product/zhenskaya-futbolka-varenka/"
+      ]
+    },
+    {
+      "url": "/product-category/zhenshhinam/hudi-zhenshhinam/",
+      "slug": "hudi-zhenshhinam",
+      "name": "Худи",
+      "parent": "zhenshhinam",
+      "products": [
+        "/product/zhenskaya-zipka-s-zavyazkoj/",
+        "/product/zhenskaya-korsetnaya-zipka-s-kapyushonom/",
+        "/product/zhenskij-sportivnyj-kostyum/",
+        "/product/zhenskij-hudi-dvojka/"
+      ]
+    },
+    {
+      "url": "/product-category/shorty/",
+      "slug": "shorty",
+      "name": "Шорты",
+      "parent": null,
+      "products": [
+        "/product/muzhskie-shorty/"
+      ]
+    },
+    {
+      "url": "/product-category/offer/",
+      "slug": "offer",
+      "name": "Оффер",
+      "parent": null,
+      "products": [
+        "/product/muzhskaya-vetrovka-s-kapyushonom/"
+      ]
+    },
+    {
+      "url": "/product-category/offer/vetroviki-offer/",
+      "slug": "vetroviki-offer",
+      "name": "Ветровки",
+      "parent": "offer",
+      "products": [
+        "/product/muzhskaya-vetrovka-s-kapyushonom/"
+      ]
+    },
+    {
+      "url": "/product-category/aksessuary/",
+      "slug": "aksessuary",
+      "name": "Аксессуары",
+      "parent": null,
+      "products": [
+        "/product/dzhinsovye-kepki/",
+        "/product/stegannaya-sumka-shopper/",
+        "/product/stegannyj-chehol-dlya-noutbuka/",
+        "/product/stegannyj-sharf-2/",
+        "/product/shopper-transformer/"
+      ]
+    },
+    {
+      "url": "/product-category/aksessuary/kepki/",
+      "slug": "kepki",
+      "name": "Кепки",
+      "parent": "aksessuary",
+      "products": [
+        "/product/dzhinsovye-kepki/"
+      ]
+    },
+    {
+      "url": "/product-category/aksessuary/sharfy/",
+      "slug": "sharfy",
+      "name": "Платки",
+      "parent": "aksessuary",
+      "products": [
+        "/product/stegannyj-sharf-2/"
+      ]
+    },
+    {
+      "url": "/product-category/aksessuary/sumki/",
+      "slug": "sumki",
+      "name": "Сумки",
+      "parent": "aksessuary",
+      "products": [
+        "/product/stegannaya-sumka-shopper/",
+        "/product/stegannyj-chehol-dlya-noutbuka/",
+        "/product/shopper-transformer/"
+      ]
+    }
+  ],
+  "_meta": {
+    "source": "https://toolorkg.com/product_cat-sitemap.xml",
+    "fetched": "2026-04-04",
+    "total_categories": 34,
+    "top_level_categories": 5,
+    "hierarchy": {
+      "Мужчинам": ["Куртки", "Лайтдаун", "Лонгсливы", "Рубашки", "Свитер", "Флис", "Брюки", "Вязанный трикотаж", "Футболки", "Свитшоты", "Худи"],
+      "Женщинам": ["Кофта", "Рубашки", "Боди", "Лонгсливы", "Боди/топы", "Свитер", "Брюки", "Ветровки", "Вязанный трикотаж", "Жилеты", "Куртки", "Свитшоты", "Футболки", "Худи"],
+      "Шорты": [],
+      "Оффер": ["Ветровки"],
+      "Аксессуары": ["Кепки", "Платки", "Сумки"]
+    }
+  }
+}

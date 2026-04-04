@@ -1,11 +1,12 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.dependencies import get_current_user, get_db
+from app.middleware.rate_limit import chat_limiter, get_client_ip
 from app.models.chat import ChatMessage, ChatSession
 from app.models.user import Profile
 from app.schemas.chat import ChatMessageCreate, ChatMessageOut, ChatSessionOut
@@ -59,9 +60,11 @@ async def get_messages(
 async def send_message(
     session_id: uuid.UUID,
     body: ChatMessageCreate,
+    request: Request,
     user: Profile = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    chat_limiter.check(get_client_ip(request))
     session = await _get_user_session(db, session_id, user.id)
 
     # Save user message

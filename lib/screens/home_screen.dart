@@ -31,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   List<Product> _newProducts = [];
   bool _isLoading = true;
   bool _loadError = false;
+  bool _loyaltyRetried = false;
 
   @override
   void initState() {
@@ -172,7 +173,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _home(BuildContext context, AuthProvider auth) {
     final loyalty = auth.loyalty;
 
-    if (_isLoading || loyalty == null) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Loyalty may be null if fetch failed during onboarding — retry once
+    if (loyalty == null) {
+      if (!_loyaltyRetried) {
+        _loyaltyRetried = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          auth.fetchLoyalty().then((_) {
+            if (mounted) setState(() {});
+          });
+        });
+      }
       return const Center(child: CircularProgressIndicator());
     }
 

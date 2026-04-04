@@ -1,11 +1,12 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 from app.dependencies import get_db
+from app.middleware.rate_limit import otp_limiter, auth_limiter, get_client_ip
 from app.models.loyalty import LoyaltyAccount
 from app.models.user import Profile
 from app.schemas.auth import (
@@ -31,11 +32,18 @@ router = APIRouter()
 
 
 @router.post("/send-otp", response_model=SendOtpResponse)
-async def send_otp(body: SendOtpRequest, db: AsyncSession = Depends(get_db)):
+async def send_otp(body: SendOtpRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Send OTP to phone number. For now returns OTP in response for dev/testing."""
+    ip = get_client_ip(request)
+    otp_limiter.check(ip)
+
     phone = body.phone.strip()
     if not phone:
         raise HTTPException(status_code=400, detail="Phone number is required")
+
+    import re
+    if not re.match(r'^\+996\d{9}$', phone):
+        raise HTTPException(status_code=400, detail="Invalid phone format. Use +996XXXXXXXXX")
 
     code = generate_otp(phone)
 
@@ -46,8 +54,11 @@ async def send_otp(body: SendOtpRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/verify-otp", response_model=TokenResponse)
-async def verify_otp_endpoint(body: VerifyOtpRequest, db: AsyncSession = Depends(get_db)):
+async def verify_otp_endpoint(body: VerifyOtpRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Verify OTP and return tokens. Creates account if user is new."""
+    ip = get_client_ip(request)
+    auth_limiter.check(ip)
+
     phone = body.phone.strip()
 
     if not verify_otp(phone, body.otp_code):

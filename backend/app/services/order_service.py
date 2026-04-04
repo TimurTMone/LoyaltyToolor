@@ -184,7 +184,12 @@ async def create_order_from_cart(
             )
             inv = inv_result.scalar_one_or_none()
             if inv:
-                inv.quantity = max(inv.quantity - ci.quantity, 0)
+                if inv.quantity < ci.quantity:
+                    raise ValueError(
+                        f"Insufficient stock for {ci.product.name} size {ci.selected_size} "
+                        f"(available: {inv.quantity}, requested: {ci.quantity})"
+                    )
+                inv.quantity -= ci.quantity
         else:
             # Fallback: decrement global stock
             if ci.product.stock is not None:

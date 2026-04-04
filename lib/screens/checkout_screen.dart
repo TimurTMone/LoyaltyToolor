@@ -14,11 +14,9 @@ import '../services/analytics_service.dart';
 // Conditionally import Finik SDK (only works on mobile)
 import 'package:finik_sdk/finik_sdk.dart';
 
-const _finikApiKey = String.fromEnvironment('FINIK_API_KEY',
-    defaultValue: 'eOJ3RXsvyZ8ztUIRp1fwq2fHJfYUyfKK2GpOgeAv');
-const _finikAccountId = String.fromEnvironment('FINIK_ACCOUNT_ID',
-    defaultValue: '54b4316f-e1d2-4007-b167-3f4dd9e0b9a7');
-const _finikIsBeta = bool.fromEnvironment('FINIK_BETA', defaultValue: true);
+const _finikApiKey = String.fromEnvironment('FINIK_API_KEY');
+const _finikAccountId = String.fromEnvironment('FINIK_ACCOUNT_ID');
+const _finikIsBeta = bool.fromEnvironment('FINIK_BETA');
 
 /// Checkout flow:
 /// Delivery/Pickup → Finik Payment → Done

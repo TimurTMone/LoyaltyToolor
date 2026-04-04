@@ -43,6 +43,37 @@ platform :ios do
     end
   end
 
+  desc "Update TestFlight 'What to Test' notes for a specific build"
+  lane :notes do |options|
+    build_number = options[:build] || ENV["BUILD_NUMBER"]
+    version = options[:version] || ENV["APP_VERSION"] || "1.0.0"
+    changelog_path = options[:file] || ENV["CHANGELOG_FILE"]
+
+    UI.user_error!("Pass build:NNN") unless build_number
+    UI.user_error!("Pass file:path") unless changelog_path && File.exist?(changelog_path)
+
+    api_key = app_store_connect_api_key(
+      key_id: ASC_API_KEY_ID,
+      issuer_id: ASC_API_ISSUER_ID,
+      key_filepath: ASC_KEY_PATH,
+    )
+
+    changelog = File.read(changelog_path)
+
+    pilot(
+      api_key: api_key,
+      app_identifier: "com.toolor.toolorApp",
+      app_platform: "ios",
+      app_version: version,
+      build_number: build_number.to_s,
+      changelog: changelog,
+      distribute_only: true,
+      distribute_external: false,
+      skip_submission: true,
+      skip_waiting_for_build_processing: true,
+    )
+  end
+
   desc "Install on connected device"
   lane :device do
     build
