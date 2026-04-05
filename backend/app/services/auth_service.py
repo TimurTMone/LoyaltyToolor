@@ -3,42 +3,73 @@ import random
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.loyalty import LoyaltyAccount
 from app.models.user import Profile
 
-# ── In-memory OTP store (phone -> {code, expires_at}) ────────────────
-# TODO: Replace with Redis or a real SMS OTP service in production.
-_otp_store: dict[str, dict] = {}
-
 OTP_LENGTH = 4
-OTP_TTL_SECONDS = 120  # OTP valid for 2 minutes
+OTP_TTL_SECONDS = 300  # 5 minutes
+MAX_VERIFY_ATTEMPTS = 5
 
 
-def generate_otp(phone: str) -> str:
-    """Generate a random OTP code, store it, and return it."""
+async def generate_otp(db: AsyncSession, phone: str) -> str:
+    """Generate a random OTP code, store it in DB (upsert), and return it."""
     code = "".join([str(random.randint(0, 9)) for _ in range(OTP_LENGTH)])
-    _otp_store[phone] = {
-        "code": code,
-        "expires_at": datetime.now(timezone.utc) + timedelta(seconds=OTP_TTL_SECONDS),
-    }
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=OTP_TTL_SECONDS)
+
+    await db.execute(
+        text("""INSERT INTO otp_codes (phone, code, expires_at, attempts)
+                VALUES (:phone, :code, :expires_at, 0)
+                ON CONFLICT (phone) DO UPDATE SET
+                    code = EXCLUDED.code,
+                    expires_at = EXCLUDED.expires_at,
+                    attempts = 0,
+                    created_at = NOW()"""),
+        {"phone": phone, "code": code, "expires_at": expires_at},
+    )
+    await db.commit()
     return code
 
 
-def verify_otp(phone: str, code: str) -> bool:
-    """Verify an OTP code for a given phone number."""
-    entry = _otp_store.get(phone)
-    if not entry:
+async def verify_otp(db: AsyncSession, phone: str, code: str) -> bool:
+    """Verify an OTP code. Rate-limits attempts per phone."""
+    result = await db.execute(
+        text("SELECT code, expires_at, attempts FROM otp_codes WHERE phone = :phone"),
+        {"phone": phone},
+    )
+    row = result.fetchone()
+    if not row:
         return False
-    if datetime.now(timezone.utc) > entry["expires_at"]:
-        _otp_store.pop(phone, None)
+
+    stored_code, expires_at, attempts = row
+
+    # Too many failed attempts — invalidate
+    if attempts >= MAX_VERIFY_ATTEMPTS:
+        await db.execute(text("DELETE FROM otp_codes WHERE phone = :phone"), {"phone": phone})
+        await db.commit()
         return False
-    if entry["code"] != code:
+
+    # Expired
+    if datetime.now(timezone.utc) > expires_at:
+        await db.execute(text("DELETE FROM otp_codes WHERE phone = :phone"), {"phone": phone})
+        await db.commit()
         return False
-    # OTP is single-use
-    _otp_store.pop(phone, None)
+
+    # Wrong code — increment attempts
+    if stored_code != code:
+        await db.execute(
+            text("UPDATE otp_codes SET attempts = attempts + 1 WHERE phone = :phone"),
+            {"phone": phone},
+        )
+        await db.commit()
+        return False
+
+    # Correct — single-use, delete
+    await db.execute(text("DELETE FROM otp_codes WHERE phone = :phone"), {"phone": phone})
+    await db.commit()
     return True
 
 

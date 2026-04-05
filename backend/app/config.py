@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     MIXPANEL_TOKEN: str = ""
     FINIK_WEBHOOK_SECRET: str = ""
 
+    # SMS providers (set one to enable real SMS)
+    SMSC_LOGIN: str = ""
+    SMSC_PASSWORD: str = ""
+    SMSC_SENDER: str = "TOOLOR"
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_FROM_NUMBER: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         return json.loads(self.CORS_ORIGINS)

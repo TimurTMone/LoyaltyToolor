@@ -29,6 +29,7 @@ from app.services.auth_service import (
 from app.services.loyalty_service import check_birthday_reward
 from app.services.analytics_service import track_signup, track_login
 from app.services.event_logger import log_event
+from app.services.sms_service import send_otp_sms, is_sms_configured
 
 router = APIRouter()
 
@@ -47,12 +48,17 @@ async def send_otp(body: SendOtpRequest, request: Request, db: AsyncSession = De
     if not re.match(r'^\+996\d{9}$', phone):
         raise HTTPException(status_code=400, detail="Invalid phone format. Use +996XXXXXXXXX")
 
-    code = generate_otp(phone)
+    code = await generate_otp(db, phone)
 
-    # TODO: Send real SMS via provider here
-    # await sms_service.send(phone, f"Your TOOLOR code: {code}")
+    # Send SMS if a provider is configured
+    sms_sent = await send_otp_sms(phone, code)
+    if not sms_sent and is_sms_configured():
+        raise HTTPException(status_code=502, detail="Failed to send SMS. Please try again.")
 
-    return SendOtpResponse(otp_code=code)
+    # In dev mode (no SMS provider), return code in response for testing
+    # In prod with real SMS, return empty string so code isn't leaked via API
+    response_code = code if not is_sms_configured() else ""
+    return SendOtpResponse(otp_code=response_code)
 
 
 @router.post("/verify-otp", response_model=TokenResponse)
@@ -63,7 +69,7 @@ async def verify_otp_endpoint(body: VerifyOtpRequest, request: Request, db: Asyn
 
     phone = body.phone.strip()
 
-    if not verify_otp(phone, body.otp_code):
+    if not await verify_otp(db, phone, body.otp_code):
         raise HTTPException(status_code=401, detail="Invalid or expired OTP code")
 
     # Find or create user
