@@ -181,40 +181,46 @@ def parse_excel_bytes(data: bytes) -> list[dict]:
                 "subcategory": subcat,
             })
 
-    products = []
+    # Second-level merge: collapse color variants with same base name + subcategory into ONE product
+    product_groups: dict[str, list[dict]] = defaultdict(list)
     for composite_key, variants in merge_groups.items():
         first = variants[0]
-        base_stripped = strip_variant_suffix(first["name"])
-        primary_color = next((v["color"] for v in variants if v["color"]), "")
-        base_name = f"{base_stripped} ({primary_color})" if primary_color else base_stripped
+        base_stripped = strip_variant_suffix(first["name"]).strip()
+        norm_key = f"{first['subcategory']}::{re.sub(r'\\s+', ' ', base_stripped.lower())}"
+        product_groups[norm_key].extend(variants)
 
-        sizes = sorted(set(v["size"] for v in variants if v["size"]))
-        colors = sorted(set(v["color"] for v in variants if v["color"]))
+    products = []
+    for norm_key, all_variants in product_groups.items():
+        first = all_variants[0]
+        base_name = strip_variant_suffix(first["name"]).strip()
+
+        sizes = sorted(set(v["size"] for v in all_variants if v["size"]))
+        colors = sorted(set(v["color"] for v in all_variants if v["color"]))
         all_images = []
-        for v in variants:
+        for v in all_variants:
             for img in v["images"]:
                 if img not in all_images:
                     all_images.append(img)
 
-        total_stock = sum(v["stock"] for v in variants)
-        max_price = max(v["price"] for v in variants)
-        max_discount = max(v["discount"] for v in variants)
+        total_stock = sum(v["stock"] for v in all_variants)
+        max_price = max(v["price"] for v in all_variants)
+        max_discount = max(v["discount"] for v in all_variants)
         original_price = None
         final_price = max_price
         if max_discount > 0 and max_discount < max_price:
             original_price = max_price
             final_price = max_price - max_discount
 
-        descriptions = [v["description"] for v in variants if v["description"]]
+        descriptions = [v["description"] for v in all_variants if v["description"]]
         description = re.sub(r'\s+', ' ', max(descriptions, key=len)).strip()[:1500] if descriptions else ""
 
-        gender = first["gender"] or next((v["gender"] for v in variants if v["gender"]), "")
+        gender = first["gender"] or next((v["gender"] for v in all_variants if v["gender"]), "")
         category = map_gender_to_category(gender, base_name)
 
         products.append({
             "sku": first["sku"],
             "name": base_name,
-            "slug": slugify(f"{base_name}-{composite_key}")[:80],
+            "slug": slugify(f"{base_name}-{norm_key}")[:80],
             "description": description,
             "price": final_price,
             "original_price": original_price,
