@@ -76,7 +76,7 @@ def map_gender_to_category(gender: str | None, name: str = "") -> str:
         return "Женщинам"
     if re.search(r'\bмуж\.?\b|мужск|для мужчин', n):
         return "Мужчинам"
-    return "Унисекс"
+    return "Аксессуары"
 
 
 def parse_excel_bytes(data: bytes) -> list[dict]:
@@ -242,7 +242,7 @@ async def import_to_db(db: AsyncSession, products: list[dict], replace_all: bool
         if key not in subcat_ids:
             subcat_ids[key] = uuid.uuid4()
 
-    cat_order = {"Мужчинам": 1, "Женщинам": 2, "Унисекс": 3, "Аксессуары": 4}
+    cat_order = {"Мужчинам": 1, "Женщинам": 2, "Аксессуары": 3}
     for name, cid in cat_ids.items():
         await db.execute(
             text("INSERT INTO categories (id, name, slug, sort_order) VALUES (:id, :name, :slug, :ord)"),
