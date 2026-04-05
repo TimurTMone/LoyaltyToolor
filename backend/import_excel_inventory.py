@@ -92,7 +92,7 @@ def map_gender_to_category(gender: str | None, name: str = "") -> str:
     if re.search(r'\bмуж\.?\b|мужск|\bmen\b|для мужчин', n):
         return "Мужчинам"
 
-    return "Унисекс"
+    return "Аксессуары"
 
 
 def parse_excel() -> list[dict]:
@@ -138,16 +138,29 @@ def parse_excel() -> list[dict]:
         stock_col = col_contains("азия молл")
 
         for row in ws.iter_rows(min_row=2, values_only=True):
-            if not row[name_col] or str(row[name_col]).strip().lower() in ("nan", "none", ""):
+            raw_name = row[name_col]
+            if not raw_name or str(raw_name).strip().lower() in ("nan", "none", "", "null"):
                 continue
+            # Clean whitespace early
+            import re as _re
+            cleaned_name = _re.sub(r'\s+', ' ', str(raw_name)).strip()
+            if not cleaned_name or cleaned_name.lower() in ("nan", "none", "null"):
+                continue
+            # Fix Excel data entry: names like "nan (Color, Size)" — replace nan with subcategory name
+            if cleaned_name.lower().startswith("nan "):
+                cleaned_name = subcat + cleaned_name[3:]
 
             sku = str(row[sku_col]).strip() if sku_col is not None and row[sku_col] else None
-            name = str(row[name_col]).strip()
-            merge_key_raw = str(row[merge_col]).strip() if merge_col is not None and row[merge_col] else sku or name
+            name = cleaned_name
+            merge_raw = str(row[merge_col]).strip() if merge_col is not None and row[merge_col] else ""
 
-            # merge_key_raw is comma-separated SKUs; use first SKU as canonical
-            skus_in_group = sorted([s.strip() for s in merge_key_raw.split(",") if s.strip()])
-            canonical_key = skus_in_group[0] if skus_in_group else name
+            if merge_raw:
+                skus_in_group = sorted([s.strip() for s in merge_raw.split(",") if s.strip()])
+                canonical_key = skus_in_group[0] if skus_in_group else name
+            else:
+                base = strip_variant_suffix(name)
+                name_color, _ = extract_color_size_from_name(name)
+                canonical_key = f"{sheet_name}::{base}::{name_color}"
 
             try:
                 price = Decimal(str(row[price_col])) if price_col is not None and row[price_col] else Decimal("0")
@@ -261,8 +274,10 @@ async def seed(products: list[dict]):
         await conn.execute("DELETE FROM subcategories")
         await conn.execute("DELETE FROM categories")
 
-        # Find Asia Mall location (we'll seed inventory here)
-        asia_mall = await conn.fetchval("SELECT id FROM locations WHERE name LIKE '%Asia%' OR name LIKE '%Азия%' LIMIT 1")
+        # Find all store locations to seed inventory across
+        store_rows = await conn.fetch("SELECT id, name FROM locations WHERE is_active = true AND type = 'store' ORDER BY sort_order")
+        store_ids = [r["id"] for r in store_rows]
+        asia_mall = store_ids[0] if store_ids else None  # kept for backwards-compat naming
 
         # Categories + subcategories
         cat_ids: dict[str, uuid.UUID] = {}
@@ -275,7 +290,7 @@ async def seed(products: list[dict]):
             if key not in subcat_ids:
                 subcat_ids[key] = uuid.uuid4()
 
-        cat_order = {"Мужчинам": 1, "Женщинам": 2, "Унисекс": 3, "Аксессуары": 4}
+        cat_order = {"Мужчинам": 1, "Женщинам": 2, "Аксессуары": 3}
         for name, cid in cat_ids.items():
             await conn.execute(
                 "INSERT INTO categories (id, name, slug, sort_order) VALUES ($1, $2, $3, $4)",
@@ -334,16 +349,17 @@ async def seed(products: list[dict]):
                 )
                 inserted += 1
 
-                # Seed Asia Mall inventory per size
-                if asia_mall and p["sizes"] and p["stock"] > 0:
+                # Seed inventory per-size across all active stores
+                if store_ids and p["sizes"] and p["stock"] > 0:
                     per_size = max(1, p["stock"] // len(p["sizes"]))
-                    for size in p["sizes"]:
-                        await conn.execute(
-                            """INSERT INTO store_inventory (id, location_id, product_id, size, quantity)
-                               VALUES ($1, $2, $3, $4, $5)
-                               ON CONFLICT (location_id, product_id, size) DO UPDATE SET quantity = EXCLUDED.quantity""",
-                            uuid.uuid4(), asia_mall, prod_id, size, per_size,
-                        )
+                    for loc_id in store_ids:
+                        for size in p["sizes"]:
+                            await conn.execute(
+                                """INSERT INTO store_inventory (id, location_id, product_id, size, quantity)
+                                   VALUES ($1, $2, $3, $4, $5)
+                                   ON CONFLICT (location_id, product_id, size) DO UPDATE SET quantity = EXCLUDED.quantity""",
+                                uuid.uuid4(), loc_id, prod_id, size, per_size,
+                            )
             except Exception as e:
                 print(f"  SKIP {p['name']}: {e}")
 

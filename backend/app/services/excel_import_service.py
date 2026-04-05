@@ -118,14 +118,27 @@ def parse_excel_bytes(data: bytes) -> list[dict]:
         stock_col = col_contains("азия молл")
 
         for row in ws.iter_rows(min_row=2, values_only=True):
-            if not row[name_col] or str(row[name_col]).strip().lower() in ("nan", "none", ""):
+            raw_name = row[name_col]
+            if not raw_name or str(raw_name).strip().lower() in ("nan", "none", "", "null"):
                 continue
+            cleaned_name = re.sub(r'\s+', ' ', str(raw_name)).strip()
+            if not cleaned_name or cleaned_name.lower() in ("nan", "none", "null"):
+                continue
+            if cleaned_name.lower().startswith("nan "):
+                cleaned_name = subcat + cleaned_name[3:]
 
             sku = str(row[sku_col]).strip() if sku_col is not None and row[sku_col] else None
-            name = str(row[name_col]).strip()
-            merge_raw = str(row[merge_col]).strip() if merge_col is not None and row[merge_col] else (sku or name)
-            skus_in_group = sorted([s.strip() for s in merge_raw.split(",") if s.strip()])
-            canonical_key = skus_in_group[0] if skus_in_group else name
+            name = cleaned_name
+            merge_raw = str(row[merge_col]).strip() if merge_col is not None and row[merge_col] else ""
+
+            if merge_raw:
+                skus_in_group = sorted([s.strip() for s in merge_raw.split(",") if s.strip()])
+                canonical_key = skus_in_group[0] if skus_in_group else name
+            else:
+                # Fallback: group by base name + color (from name suffix) within same sheet
+                base = strip_variant_suffix(name)
+                name_color, _ = extract_color_size_from_name(name)
+                canonical_key = f"{sheet_name}::{base}::{name_color}"
 
             try:
                 price = Decimal(str(row[price_col])) if price_col is not None and row[price_col] else Decimal("0")
@@ -228,10 +241,11 @@ async def import_to_db(db: AsyncSession, products: list[dict], replace_all: bool
         await db.execute(text("DELETE FROM subcategories"))
         await db.execute(text("DELETE FROM categories"))
 
-    asia_mall_result = await db.execute(
-        text("SELECT id FROM locations WHERE name LIKE '%Asia%' OR name LIKE '%Азия%' LIMIT 1")
+    # Seed inventory across ALL active stores
+    stores_result = await db.execute(
+        text("SELECT id FROM locations WHERE is_active = true AND type = 'store' ORDER BY sort_order")
     )
-    asia_mall_id = asia_mall_result.scalar()
+    store_ids = [row[0] for row in stores_result.fetchall()]
 
     cat_ids: dict[str, uuid.UUID] = {}
     subcat_ids: dict[str, uuid.UUID] = {}
@@ -300,15 +314,16 @@ async def import_to_db(db: AsyncSession, products: list[dict], replace_all: bool
         )
         inserted += 1
 
-        if asia_mall_id and p["sizes"] and p["stock"] > 0:
+        if store_ids and p["sizes"] and p["stock"] > 0:
             per_size = max(1, p["stock"] // len(p["sizes"]))
-            for size in p["sizes"]:
-                await db.execute(
-                    text("""INSERT INTO store_inventory (id, location_id, product_id, size, quantity)
-                            VALUES (:id, :loc, :prod, :size, :qty)
-                            ON CONFLICT (location_id, product_id, size) DO UPDATE SET quantity = EXCLUDED.quantity"""),
-                    {"id": uuid.uuid4(), "loc": asia_mall_id, "prod": prod_id, "size": size, "qty": per_size},
-                )
+            for loc_id in store_ids:
+                for size in p["sizes"]:
+                    await db.execute(
+                        text("""INSERT INTO store_inventory (id, location_id, product_id, size, quantity)
+                                VALUES (:id, :loc, :prod, :size, :qty)
+                                ON CONFLICT (location_id, product_id, size) DO UPDATE SET quantity = EXCLUDED.quantity"""),
+                        {"id": uuid.uuid4(), "loc": loc_id, "prod": prod_id, "size": size, "qty": per_size},
+                    )
 
     await db.commit()
 
