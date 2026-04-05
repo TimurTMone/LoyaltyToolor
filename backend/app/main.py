@@ -26,11 +26,13 @@ from app.routers.admin import (
 )
 from app.middleware.request_logging import RequestLoggingMiddleware
 
+import os
 if settings.SENTRY_DSN:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         traces_sample_rate=0.3,
-        environment="production",
+        environment=os.getenv("ENVIRONMENT", "production"),
+        send_default_pii=False,
     )
 
 logging.basicConfig(level=logging.INFO)
@@ -109,3 +111,14 @@ app.include_router(admin_analytics.router, prefix="/api/v1/admin", tags=["admin-
 @app.get("/api/v1/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/v1/sentry-debug")
+async def sentry_debug():
+    """Intentionally raises an error to verify Sentry is capturing exceptions.
+    Also returns whether Sentry is configured."""
+    sentry_enabled = bool(settings.SENTRY_DSN)
+    if not sentry_enabled:
+        return {"sentry_configured": False, "message": "SENTRY_DSN not set"}
+    division_by_zero = 1 / 0  # noqa — intentional
+    return {"result": division_by_zero}
