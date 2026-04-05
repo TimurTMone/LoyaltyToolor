@@ -10,12 +10,14 @@ from app.middleware.rate_limit import otp_limiter, auth_limiter, get_client_ip
 from app.models.loyalty import LoyaltyAccount
 from app.models.user import Profile
 from app.schemas.auth import (
+    LoginRequest,
     RefreshRequest,
     SendOtpRequest,
     SendOtpResponse,
     TokenResponse,
     VerifyOtpRequest,
 )
+import bcrypt
 from app.services.auth_service import (
     create_access_token,
     create_refresh_token,
@@ -87,6 +89,31 @@ async def verify_otp_endpoint(body: VerifyOtpRequest, request: Request, db: Asyn
         await log_event(db, user.id, "login", {"method": "phone_otp"})
         await db.commit()
         track_login(str(user.id))
+
+    return TokenResponse(
+        access_token=create_access_token(user),
+        refresh_token=create_refresh_token(user),
+    )
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """Phone + password login. Used by the admin panel."""
+    ip = get_client_ip(request)
+    auth_limiter.check(ip)
+
+    phone = body.phone.strip()
+    result = await db.execute(select(Profile).where(Profile.phone == phone))
+    user = result.scalar_one_or_none()
+    if not user or not user.password_hash:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not bcrypt.checkpw(body.password.encode(), user.password_hash.encode()):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    await log_event(db, user.id, "login", {"method": "password"})
+    await db.commit()
+    track_login(str(user.id))
 
     return TokenResponse(
         access_token=create_access_token(user),
