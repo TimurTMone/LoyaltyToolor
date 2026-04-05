@@ -192,19 +192,14 @@ def parse_excel() -> list[dict]:
                 "subcategory": subcat,
             })
 
-    # Second-level merge: combine color-variants by base name + subcategory
-    products_by_base: dict[str, list[dict]] = defaultdict(list)
-    for key, variants in merge_groups.items():
-        first = variants[0]
-        base_name = strip_variant_suffix(first["name"])
-        # Category will be computed later; use subcategory here
-        composite_key = f"{base_name.lower()}::{first['subcategory']}"
-        products_by_base[composite_key].extend(variants)
-
+    # One product per merge-group (color+style variants stay separate since they have distinct images)
     products = []
-    for composite_key, variants in products_by_base.items():
+    for composite_key, variants in merge_groups.items():
         first = variants[0]
-        base_name = strip_variant_suffix(first["name"])
+        base_name_stripped = strip_variant_suffix(first["name"])
+        # Add color to name if known, to differentiate color variants
+        primary_color = next((v["color"] for v in variants if v["color"]), "")
+        base_name = f"{base_name_stripped} ({primary_color})" if primary_color else base_name_stripped
 
         sizes = sorted(set(v["size"] for v in variants if v["size"]))
         colors = sorted(set(v["color"] for v in variants if v["color"]))

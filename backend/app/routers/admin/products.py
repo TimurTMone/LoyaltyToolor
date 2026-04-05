@@ -1,7 +1,7 @@
 import math
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,8 +10,49 @@ from app.dependencies import get_db, require_admin
 from app.models.product import Product
 from app.routers.products import _product_to_out
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
+from app.services.excel_import_service import parse_excel_bytes, import_to_db
 
 router = APIRouter(dependencies=[Depends(require_admin)])
+
+
+@router.post("/import-excel", response_model=dict)
+async def import_excel(
+    file: UploadFile = File(...),
+    replace_all: bool = True,
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload a TOOLOR-format Excel file and bulk-import products.
+
+    Parses sheet structure, groups variants by SKU, extracts sizes/colors/images,
+    auto-creates categories and subcategories, and seeds per-size inventory for Asia Mall.
+    """
+    if not file.filename or not file.filename.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Upload a .xlsx file")
+
+    contents = await file.read()
+    if len(contents) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (max 50MB)")
+
+    try:
+        products = parse_excel_bytes(contents)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse Excel: {e}")
+
+    if not products:
+        raise HTTPException(status_code=400, detail="No valid products found in Excel")
+
+    try:
+        summary = await import_to_db(db, products, replace_all=replace_all)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Import failed: {e}")
+
+    return {
+        "ok": True,
+        "filename": file.filename,
+        "products_parsed": len(products),
+        **summary,
+    }
 
 
 @router.get("", response_model=dict)

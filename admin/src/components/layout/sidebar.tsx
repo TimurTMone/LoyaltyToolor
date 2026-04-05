@@ -13,6 +13,7 @@ import {
   ScanLine,
   Bell,
   Warehouse,
+  FileSpreadsheet,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const iconMap: Record<string, LucideIcon> = {
   MapPin,
   Bell,
   Warehouse,
+  FileSpreadsheet,
 };
 
 export function Sidebar() {

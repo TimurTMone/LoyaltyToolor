@@ -18,6 +18,7 @@ export const NAV_ITEMS = [
   { href: "/", label: "Панель", icon: "LayoutDashboard" },
   { href: "/scan", label: "Сканер QR", icon: "ScanLine" },
   { href: "/products", label: "Товары", icon: "Package" },
+  { href: "/import", label: "Импорт Excel", icon: "FileSpreadsheet" },
   { href: "/orders", label: "Заказы", icon: "ShoppingCart" },
   { href: "/users", label: "Пользователи", icon: "Users" },
   { href: "/categories", label: "Категории", icon: "FolderTree" },

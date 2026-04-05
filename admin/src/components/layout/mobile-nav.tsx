@@ -13,6 +13,7 @@ import {
   MapPin,
   Bell,
   Warehouse,
+  FileSpreadsheet,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ const iconMap: Record<string, LucideIcon> = {
   MapPin,
   Bell,
   Warehouse,
+  FileSpreadsheet,
 };
 
 interface MobileNavProps {

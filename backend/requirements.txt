@@ -8,6 +8,7 @@ python-jose[cryptography]==3.3.0
 bcrypt==4.2.1
 python-multipart==0.0.19
 pillow==11.1.0
+openpyxl==3.1.5
 httpx==0.28.1
 sentry-sdk[fastapi]==2.19.2
 anthropic==0.43.0
